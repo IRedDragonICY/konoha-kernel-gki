@@ -675,6 +675,14 @@ DECLARE_RESTRICTED_HOOK(android_rvh_gup_longterm_locked,
 		unsigned long start, unsigned long nr_pages,
 		struct page **pages),
 	TP_ARGS(rc, nr_pinned_pages, start, nr_pages, pages), 5);
+DECLARE_HOOK(android_vh_folio_add_file_rmap,
+	TP_PROTO(struct folio *folio, struct page *page, int nr_pages,
+		 int level),
+	TP_ARGS(folio, page, nr_pages, level));
+DECLARE_HOOK(android_vh_folio_remove_rmap,
+	TP_PROTO(struct folio *folio, struct page *page, int nr_pages,
+		 int level),
+	TP_ARGS(folio, page, nr_pages, level));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
