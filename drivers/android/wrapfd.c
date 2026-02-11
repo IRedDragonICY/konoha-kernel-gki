@@ -35,8 +35,7 @@ static const struct file_operations wrap_fops;
 struct wrap_content_operations {
 	int (*create_wrap)(struct wrap_content *content, struct wrap_ctx *ctx);
 	int (*load)(struct wrap_content *content, struct file *file,
-		    unsigned long file_offs, unsigned long buf_offs,
-		    unsigned long len);
+		    loff_t file_offs, loff_t buf_offs, loff_t len);
 	int (*mmap_prepare)(struct wrap_content *content,
 			    struct vm_area_struct *vma);
 	int (*mmap)(struct wrap_content *content, struct vm_area_struct *vma);
@@ -79,94 +78,76 @@ static int dmabuf_content_create_wrap(struct wrap_content *content,
 				dmabuf_content->writable ? O_RDWR : O_RDONLY);
 }
 
-static struct miscdevice wrapfd_misc;
-
-static unsigned int init_bio_data(struct sg_table *sgtbl,
-				  size_t offset, size_t len,
-				  struct bio_vec *bvec)
-{
-	struct scatterlist *sg;
-	unsigned int count = 0;
-	size_t end_offs = 0;
-	unsigned int i;
-	size_t sg_len;
-
-	for_each_sg(sgtbl->sgl, sg, sgtbl->nents, i) {
-		end_offs += sg->length;
-		if (end_offs <= offset)
-			continue;
-
-		sg_len = end_offs - offset;
-		bvec[count].bv_page = sg_page(sg);
-		bvec[count].bv_offset = sg->offset + sg->length - sg_len;
-		if (sg_len >= len) {
-			bvec[count++].bv_len = len;
-			break;
-		}
-		bvec[count++].bv_len = sg_len;
-		offset += sg_len;
-		len -= sg_len;
-	}
-
-	return count;
-}
-
 static int dmabuf_content_load(struct wrap_content *content, struct file *file,
-			       unsigned long file_offs, unsigned long buf_offs,
-			       unsigned long len)
+			       loff_t file_offs, loff_t buf_offs, loff_t len)
 {
 	struct wrap_content_dmabuf *dmabuf_content;
-	struct dma_buf_attachment *attachment;
-	unsigned int bvec_size;
-	struct sg_table *sgtbl;
-	struct bio_vec *bvec;
+	struct iosys_map map;
 	struct iov_iter iter;
 	struct kiocb kiocb;
+	loff_t bytes_read;
+	struct kvec iov;
+	loff_t end;
 	int ret;
 
 	dmabuf_content = container_of(content, struct wrap_content_dmabuf,
 				      content);
 
-	if (file_offs + len > dmabuf_content->dmabuf->size - buf_offs)
+	if (check_add_overflow(buf_offs, len, &end))
 		return -EINVAL;
 
-	attachment = dma_buf_attach(dmabuf_content->dmabuf,
-				    wrapfd_misc.this_device);
-	if (IS_ERR(attachment))
-		return PTR_ERR(attachment);
+	if (end > dmabuf_content->dmabuf->size)
+		return -EINVAL;
 
-	sgtbl = dma_buf_map_attachment(attachment, DMA_FROM_DEVICE);
-	if (IS_ERR(sgtbl)) {
-		dma_buf_detach(dmabuf_content->dmabuf, attachment);
-		return PTR_ERR(sgtbl);
+	ret = dma_buf_begin_cpu_access(dmabuf_content->dmabuf,
+				       DMA_BIDIRECTIONAL);
+	if (ret)
+		return ret;
+
+	ret = dma_buf_vmap(dmabuf_content->dmabuf, &map);
+	if (ret)
+		goto err_end_access;
+
+	if (map.is_iomem) {
+		ret = -EINVAL;
+		goto err_unmap;
 	}
 
-	dma_buf_mangle_sg_table(sgtbl);
-
-	bvec = kvcalloc(sgtbl->nents, sizeof(*bvec), GFP_KERNEL);
-	if (!bvec) {
-		dma_buf_unmap_attachment(attachment, sgtbl, DMA_FROM_DEVICE);
-		dma_buf_detach(dmabuf_content->dmabuf, attachment);
-		return -ENOMEM;
-	}
-
-	bvec_size = init_bio_data(sgtbl, buf_offs, len, bvec);
-	iov_iter_bvec(&iter, ITER_DEST, bvec, bvec_size, len);
+	iov.iov_base = (u8 *)map.vaddr + buf_offs;
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = file_offs;
 	kiocb.ki_flags |= IOCB_DIRECT;
 
-	while (kiocb.ki_pos < file_offs + len) {
-		ret = vfs_iocb_iter_read(file, &kiocb, &iter);
-		if (ret <= 0)
-			break;
+	while (len) {
+		loff_t count = min_t(loff_t, MAX_RW_COUNT, len);
+
+		iov.iov_len = count;
+		iov_iter_kvec(&iter, ITER_DEST, &iov, 1, iov.iov_len);
+		bytes_read = 0;
+		while (bytes_read < count) {
+			ssize_t sz = vfs_iocb_iter_read(file, &kiocb, &iter);
+
+			if (sz <= 0) {
+				ret = sz;
+				goto err_unmap;
+			}
+			bytes_read += sz;
+		}
+		iov.iov_base += count;
+		len -= count;
 	}
+err_unmap:
+	dma_buf_vunmap(dmabuf_content->dmabuf, &map);
+err_end_access:
+	dma_buf_end_cpu_access(dmabuf_content->dmabuf, DMA_BIDIRECTIONAL);
 
-	kvfree(bvec);
-	dma_buf_unmap_attachment(attachment, sgtbl, DMA_FROM_DEVICE);
-	dma_buf_detach(dmabuf_content->dmabuf, attachment);
+	if (ret < 0)
+		return ret;
 
-	return ret < 0 ? ret : 0;
+	if (len)
+		return -EINVAL; /* File was too short / early EOF */
+
+	return 0;
 }
 
 static int dmabuf_content_mmap_prepare(struct wrap_content *content,
@@ -568,6 +549,7 @@ static int wrap_file_load(struct wrap_ctx *ctx,
 {
 	struct wrapfd_load wrapfd_load;
 	struct file *file;
+	loff_t end;
 	int ret = 0;
 
 	if (copy_from_user(&wrapfd_load, user_wrapfd_load,
@@ -607,8 +589,13 @@ static int wrap_file_load(struct wrap_ctx *ctx,
 	/* Align the size to the page boundary */
 	wrapfd_load.len = PAGE_ALIGN(wrapfd_load.len);
 
-	if (wrapfd_load.file_offs + wrapfd_load.len >
-	    i_size_read(file_inode(file))) {
+	if (check_add_overflow(wrapfd_load.file_offs, wrapfd_load.len,
+			       &end)) {
+		ret = -EINVAL;
+		goto put_file;
+	}
+
+	if (end > i_size_read(file_inode(file))) {
 		ret = -EINVAL;
 		goto put_file;
 	}
@@ -1039,9 +1026,6 @@ static int __init wrapfd_init(void)
 		pr_err("failed to register misc device!\n");
 		return ret;
 	}
-	dma_coerce_mask_and_coherent(wrapfd_misc.this_device,
-				     DMA_BIT_MASK(64));
-	wrapfd_misc.this_device->bus_dma_limit = DMA_BIT_MASK(64);
 
 	return 0;
 }
