@@ -321,6 +321,72 @@ static void test_remap_file_pages(struct __test_metadata *_metadata,
 	close(wrapfd);
 }
 
+static void test_wrap_remap(struct __test_metadata *_metadata,
+			    FIXTURE_DATA(wrapfd_tests) *self, int fd)
+{
+	char *ptr, *new_ptr;
+	int wrapfd;
+
+	wrapfd = wrapfd_wrap(self->dev_fd, fd, PROT_READ | PROT_WRITE);
+	ASSERT_TRUE(wrapfd >= 0);
+
+	/* Check content of the buffer before modification */
+	ASSERT_EQ(cmp_content(_metadata, self, wrapfd), 0);
+
+	/* Modify buffer content */
+	ptr = mmap(NULL, self->size, PROT_READ | PROT_WRITE, MAP_SHARED,
+		   wrapfd, 0);
+	ASSERT_NE(ptr, MAP_FAILED);
+
+	/* Remap to a new address */
+	new_ptr = mremap(ptr, self->size, self->size, MREMAP_MAYMOVE);
+	ASSERT_NE(new_ptr, MAP_FAILED);
+	ASSERT_EQ(memcmp(self->content, new_ptr, self->size), 0);
+	ptr = new_ptr;
+
+	/* Resize the mapping */
+	new_ptr = mremap(ptr, self->size, self->size / 2, MREMAP_MAYMOVE);
+	ASSERT_NE(new_ptr, MAP_FAILED);
+	ASSERT_EQ(memcmp(self->content, new_ptr, self->size / 2), 0);
+	ptr = new_ptr;
+	ASSERT_EQ(munmap(ptr, self->size), 0);
+
+	close(wrapfd);
+}
+
+static void test_wrap_fork(struct __test_metadata *_metadata,
+			   FIXTURE_DATA(wrapfd_tests) *self, int fd)
+{
+	int wrapfd;
+	char *ptr;
+	pid_t pid;
+
+	wrapfd = wrapfd_wrap(self->dev_fd, fd, PROT_READ | PROT_WRITE);
+	ASSERT_TRUE(wrapfd >= 0);
+
+	/* Check content of the buffer before modification */
+	ASSERT_EQ(cmp_content(_metadata, self, wrapfd), 0);
+
+	/* Modify buffer content */
+	ptr = mmap(NULL, self->size, PROT_READ | PROT_WRITE, MAP_SHARED,
+		   wrapfd, 0);
+	ASSERT_NE(ptr, MAP_FAILED);
+
+	pid = fork();
+	ASSERT_FALSE(pid < 0);
+	if (pid == 0) {
+		/* Check the content from the child */
+		ASSERT_EQ(memcmp(self->content, ptr, self->size), 0);
+		exit(EXIT_SUCCESS);
+	} else {
+		wait(NULL);
+	}
+
+	ASSERT_EQ(munmap(ptr, self->size), 0);
+
+	close(wrapfd);
+}
+
 static void test_dup(struct __test_metadata *_metadata,
 		     FIXTURE_DATA(wrapfd_tests) *self, int fd)
 {
@@ -464,7 +530,7 @@ static void test_empty(struct __test_metadata *_metadata,
 	/* Take buffer ownership */
 	ASSERT_EQ(wrapfd_acquire_ownership(wrapfd), 0);
 
-	/* Try emtying a mapped buffer */
+	/* Try emptying a mapped buffer */
 	ptr = mmap(NULL, self->size, PROT_READ | PROT_WRITE, MAP_PRIVATE,
 		   wrapfd, 0);
 	ASSERT_NE(ptr, MAP_FAILED);
@@ -627,6 +693,8 @@ static void run_tests(struct __test_metadata *_metadata,
 	test_wrap_rdonly(_metadata, self, fd);
 	test_wrap_rdwr(_metadata, self, fd);
 	test_remap_file_pages(_metadata, self, fd);
+	test_wrap_remap(_metadata, self, fd);
+	test_wrap_fork(_metadata, self, fd);
 	test_dup(_metadata, self, fd);
 	test_owner(_metadata, self, fd);
 	test_rewrap(_metadata, self, fd);
