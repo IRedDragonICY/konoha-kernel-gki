@@ -306,7 +306,7 @@ struct wrap_ctx {
 	spinlock_t lock; /* protects all fields below */
 	struct wrap_owner owner;
 	bool allow_guests;
-	int map_count;
+	unsigned long map_count;
 	/*
 	 * Mask of blocked operations when lock is not held due to possiblity
 	 * of sleep during the ongoing operation.
@@ -436,7 +436,10 @@ static void wrap_vm_close(struct vm_area_struct *vma)
 
 	ctx = mapping->ctx;
 	spin_lock(&ctx->lock);
-	ctx->map_count--;
+	if (ctx->map_count > 0)
+		ctx->map_count--;
+	else
+		pr_warn("wrapfd map count underflow\n");
 	if (refcount_dec_and_test(&mapping->refcnt))
 		kfree(mapping);
 	spin_unlock(&ctx->lock);
@@ -831,7 +834,7 @@ static void wrap_show_fdinfo(struct seq_file *m, struct file *file)
 			seq_printf(m, "owner:\t<none>\n");
 	}
 	seq_printf(m, "guests:\t%s\n", ctx->allow_guests ? "yes" : "no");
-	seq_printf(m, "maps:\t%d\n", ctx->map_count);
+	seq_printf(m, "maps:\t%lu\n", ctx->map_count);
 	seq_printf(m, "empty:\t%s\n", ctx->content ? "no" : "yes");
 	if (ctx->content) {
 		struct wrap_content *content = ctx->content;
