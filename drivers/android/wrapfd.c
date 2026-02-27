@@ -21,9 +21,9 @@
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <linux/uio.h>
+#include <linux/wrapfd.h>
 #include <uapi/linux/wrapfd.h>
 
-#include "wrapfd.h"
 
 #define FDINFO_BUF_SIZE	100
 
@@ -863,6 +863,11 @@ static void wrap_show_fdinfo(struct seq_file *m, struct file *file)
 	spin_unlock(&ctx->lock);
 }
 #endif
+
+bool is_wrapfd_vma(struct vm_area_struct *vma)
+{
+	return (vma && (vma->vm_ops->open == wrap_vm_open));
+}
 
 int wrapfd_get(struct file *file, struct device *dev,
 	       union wrapfd_mappable *mappable)
