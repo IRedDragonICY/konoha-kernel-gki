@@ -474,6 +474,8 @@
   __tracepoint_android_vh_handle_folio_writeback
   __traceiter_android_vh_reclaim_before_kswapd
   __tracepoint_android_vh_reclaim_before_kswapd
+  __traceiter_android_rvh_swap_bio_charge
+  __tracepoint_android_rvh_swap_bio_charge
 
 #required by mem_reclaim_ctl.ko
 __traceiter_android_vh_page_should_be_protected
