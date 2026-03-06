@@ -3299,6 +3299,16 @@ static inline bool __should_serialize_io(struct inode *inode,
 	return false;
 }
 
+static inline void update_skipped_write(struct f2fs_sb_info *sbi,
+						struct writeback_control *wbc)
+{
+	long skipped = wbc->pages_skipped;
+
+	if (is_sbi_flag_set(sbi, SBI_ENABLE_CHECKPOINT) && skipped &&
+		wbc->sync_mode == WB_SYNC_ALL)
+		atomic_add(skipped, &sbi->nr_pages[F2FS_SKIPPED_WRITE]);
+}
+
 static inline void account_writeback(struct inode *inode, bool inc)
 {
 	if (!f2fs_sb_has_compression(F2FS_I_SB(inode)))
@@ -3310,16 +3320,6 @@ static inline void account_writeback(struct inode *inode, bool inc)
 	else
 		atomic_dec(&F2FS_I(inode)->writeback);
 	f2fs_up_read(&F2FS_I(inode)->i_sem);
-}
-
-static inline void update_skipped_write(struct f2fs_sb_info *sbi,
-						struct writeback_control *wbc)
-{
-	long skipped = wbc->pages_skipped;
-
-	if (is_sbi_flag_set(sbi, SBI_ENABLE_CHECKPOINT) && skipped &&
-		wbc->sync_mode == WB_SYNC_ALL)
-		atomic_add(skipped, &sbi->nr_pages[F2FS_SKIPPED_WRITE]);
 }
 
 static int __f2fs_write_data_pages(struct address_space *mapping,
