@@ -495,7 +495,7 @@ static int show_map(struct seq_file *m, void *v)
 {
 	struct vm_area_struct *vma = v;
 
-	if (vma_pages(vma))
+	if (vma_data_pages(vma))
 		show_map_vma(m, vma);
 
 	show_map_pad_vma(vma, m, show_map_vma, false);
@@ -1042,7 +1042,7 @@ static int show_smap(struct seq_file *m, void *v)
 
 	memset(&mss, 0, sizeof(mss));
 
-	if (!vma_pages(vma))
+	if (!vma_data_pages(vma))
 		goto show_pad;
 
 	smap_gather_stats(vma, &mss, 0);
