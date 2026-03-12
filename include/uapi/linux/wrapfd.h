@@ -11,8 +11,8 @@
 #include <linux/types.h>
 
 struct wrapfd_wrap {
-	__s64 fd;		/* [in] file to wrap */
-	__u64 prot;		/* [in] protection bits */
+	__u32 fd;		/* [in] file to wrap */
+	__u32 prot;		/* [in] protection bits */
 	__u64 reserved;
 };
 
@@ -21,12 +21,14 @@ struct wrapfd_wrap {
 #define WRAPFD_CONTENT_RDWR	2
 
 struct wrapfd_get_state {
-	__u64 state;		/* [out] wrapfd content state */
+	__u32 state;		/* [out] wrapfd content state */
+	__u32 pad;
 	__u64 reserved;
 };
 
 struct wrapfd_load {
-	__s64 fd;		/* [in] file to load */
+	__u32 fd;		/* [in] file to load */
+	__u32 pad;
 	__u64 file_offs;	/* [in] file offset */
 	__u64 buf_offs;		/* [in] buffer offset */
 	__u64 len;		/* [in] number of bytes to load */
@@ -34,7 +36,8 @@ struct wrapfd_load {
 };
 
 struct wrapfd_rewrap {
-	__u64 prot;		/* [in] protection bits */
+	__u32 prot;		/* [in] protection bits */
+	__u32 pad;
 	__u64 reserved;
 };
 

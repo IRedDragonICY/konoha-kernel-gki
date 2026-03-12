@@ -39,7 +39,7 @@
 #include "../../kselftest_harness.h"
 
 /* ioctl wrappers */
-static inline int wrapfd_wrap(int dev_fd, int fd, unsigned int prot)
+static inline int wrapfd_wrap(int dev_fd, int fd, int prot)
 {
 	struct wrapfd_wrap wrap = {
 		.fd = fd,
@@ -49,7 +49,7 @@ static inline int wrapfd_wrap(int dev_fd, int fd, unsigned int prot)
 	return ioctl(dev_fd, WRAPFD_DEV_IOC_WRAP, &wrap);
 }
 
-static inline int wrapfd_get_state(int wrapfd, unsigned long *state)
+static inline int wrapfd_get_state(int wrapfd, unsigned int *state)
 {
 	struct wrapfd_get_state wrap_state = { 0 };
 	int ret;
@@ -84,7 +84,7 @@ static inline int wrapfd_load(int wrapfd, int fd, unsigned long file_offs,
 	return ioctl(wrapfd, WRAPFD_DEV_IOC_LOAD, &load);
 }
 
-static inline int wrapfd_rewrap(int wrapfd, unsigned int prot)
+static inline int wrapfd_rewrap(int wrapfd, int prot)
 {
 	struct wrapfd_rewrap rewrap = {
 		.prot = prot,
@@ -351,7 +351,7 @@ static void test_rewrap(struct __test_metadata *_metadata,
 			FIXTURE_DATA(wrapfd_tests) *self, int fd)
 {
 	int wrapfd, wrapfd2, wrapfd3;
-	unsigned long state;
+	unsigned int state;
 	char *ptr;
 
 	wrapfd = wrapfd_wrap(self->dev_fd, fd, PROT_READ);
@@ -424,7 +424,7 @@ static void test_rewrap(struct __test_metadata *_metadata,
 static void test_empty(struct __test_metadata *_metadata,
 		       FIXTURE_DATA(wrapfd_tests) *self, int fd)
 {
-	unsigned long state;
+	unsigned int state;
 	int wrapfd;
 	char *ptr;
 

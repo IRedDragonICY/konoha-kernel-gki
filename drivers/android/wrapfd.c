@@ -559,7 +559,7 @@ static int get_wrap_state(struct wrap_ctx *ctx,
 			   sizeof(wrapfd_get_state)))
 		return -EFAULT;
 
-	if (wrapfd_get_state.reserved)
+	if (wrapfd_get_state.reserved || wrapfd_get_state.pad)
 		return -EINVAL;
 
 	spin_lock(&ctx->lock);
@@ -651,7 +651,7 @@ static int wrap_file_load(struct wrap_ctx *ctx,
 	if (!PAGE_ALIGNED(wrapfd_load.buf_offs))
 		return -EINVAL;
 
-	if (wrapfd_load.reserved)
+	if (wrapfd_load.reserved || wrapfd_load.pad)
 		return -EINVAL;
 
 	file = fget(wrapfd_load.fd);
@@ -728,7 +728,7 @@ static int wrap_file_rewrap(struct wrap_ctx *ctx,
 	if (wrapfd_rewrap.prot & ~(PROT_WRITE | PROT_READ))
 		return -EINVAL;
 
-	if (wrapfd_rewrap.reserved)
+	if (wrapfd_rewrap.reserved || wrapfd_rewrap.pad)
 		return -EINVAL;
 
 	spin_lock(&ctx->lock);
