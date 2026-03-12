@@ -294,6 +294,33 @@ static void test_wrap_rdwr(struct __test_metadata *_metadata,
 	close(wrapfd);
 }
 
+static void test_remap_file_pages(struct __test_metadata *_metadata,
+				  FIXTURE_DATA(wrapfd_tests) *self, int fd)
+{
+	int wrapfd;
+	char *ptr;
+
+	/* remap_file_pages() on the content should succeed */
+	ptr = mmap(NULL, self->size, PROT_READ | PROT_WRITE, MAP_SHARED,
+		   fd, 0);
+	ASSERT_NE(ptr, MAP_FAILED);
+	ASSERT_EQ(remap_file_pages(ptr, self->page_size, 0, 1, 0), 0);
+	ASSERT_EQ(munmap(ptr, self->size), 0);
+
+	/* remap_file_pages() on the wrapfd should fail with EINVAL error */
+	wrapfd = wrapfd_wrap(self->dev_fd, fd, PROT_READ | PROT_WRITE);
+	ASSERT_TRUE(wrapfd >= 0);
+
+	ptr = mmap(NULL, self->size, PROT_READ | PROT_WRITE, MAP_SHARED,
+		   wrapfd, 0);
+	ASSERT_NE(ptr, MAP_FAILED);
+	ASSERT_EQ(remap_file_pages(ptr, self->page_size, 0, 1, 0), -1);
+	ASSERT_EQ(errno, EINVAL);
+	ASSERT_EQ(munmap(ptr, self->size), 0);
+
+	close(wrapfd);
+}
+
 static void test_dup(struct __test_metadata *_metadata,
 		     FIXTURE_DATA(wrapfd_tests) *self, int fd)
 {
@@ -599,6 +626,7 @@ static void run_tests(struct __test_metadata *_metadata,
 	test_load(_metadata, self, fd);
 	test_wrap_rdonly(_metadata, self, fd);
 	test_wrap_rdwr(_metadata, self, fd);
+	test_remap_file_pages(_metadata, self, fd);
 	test_dup(_metadata, self, fd);
 	test_owner(_metadata, self, fd);
 	test_rewrap(_metadata, self, fd);
