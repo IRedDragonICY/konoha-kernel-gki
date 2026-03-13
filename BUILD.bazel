@@ -393,22 +393,17 @@ kernel_modules_install(
     kernel_modules = [":wonder_ddk_modules"],
 )
 
-pkg_files(
-    name = "wonder_aarch64_dist_files",
-    srcs = [
+copy_to_dist_dir(
+    name = "wonder_aarch64_dist",
+    data = [
         ":kernel_aarch64",
         ":kernel_aarch64_additional_artifacts",
         ":wonder_aarch64",
         ":wonder_aarch64_modules_install",
     ],
-    strip_prefix = strip_prefix.files_only(),
-    visibility = ["//visibility:private"],
-)
-
-pkg_install(
-    name = "wonder_aarch64_dist",
-    srcs = [":wonder_aarch64_dist_files"],
-    destdir = "out/wonder_aarch64/dist",
+    dist_dir = "out/wonder_aarch64/dist",
+    flat = True,
+    log = "info",
 )
 
 _DB845C_MODULE_OUTS = [
