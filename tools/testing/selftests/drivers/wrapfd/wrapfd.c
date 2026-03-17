@@ -350,7 +350,7 @@ static void test_wrap_remap(struct __test_metadata *_metadata,
 	ASSERT_NE(new_ptr, MAP_FAILED);
 	ASSERT_EQ(memcmp(self->content, new_ptr, self->size / 2), 0);
 	ptr = new_ptr;
-	ASSERT_EQ(munmap(ptr, self->size), 0);
+	ASSERT_EQ(munmap(ptr, self->size / 2), 0);
 
 	close(wrapfd);
 }
