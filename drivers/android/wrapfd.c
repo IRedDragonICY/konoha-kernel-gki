@@ -24,9 +24,6 @@
 #include <linux/wrapfd.h>
 #include <uapi/linux/wrapfd.h>
 
-
-#define FDINFO_BUF_SIZE	100
-
 struct wrap_ctx;
 struct wrap_content;
 static const struct file_operations wrap_fops;
