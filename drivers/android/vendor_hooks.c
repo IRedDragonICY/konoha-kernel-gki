@@ -731,3 +731,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_swap_bio_charge);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_task_mem);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mm_free);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mm_init);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_lock_delay_schedule);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_lock_task_fork);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_lock_task_exit);
