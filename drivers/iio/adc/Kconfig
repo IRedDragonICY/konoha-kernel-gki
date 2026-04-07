@@ -961,6 +961,48 @@ config QCOM_SPMI_ADC5
 	  To compile this driver as a module, choose M here: the module will
 	  be called qcom-spmi-adc5.
 
+config QCOM_SPMI_ADC5_GEN3
+	tristate "Qualcomm Technologies Inc. SPMI PMIC5 GEN3 ADC"
+	depends on SPMI
+	select REGMAP_SPMI
+	select QCOM_VADC_COMMON
+	help
+	  This is the IIO Voltage PMIC5 Gen3 ADC driver for Qualcomm Technologies Inc.
+
+	  The driver supports multiple channels read. The ADC is a 16-bit
+	  sigma-delta ADC. The hardware supports calibrated results for
+	  conversion requests and clients include reading voltage phone
+	  power, on board system thermistors connected to the PMIC ADC,
+	  PMIC die temperature, charger temperature, battery current, USB voltage
+	  input, voltage signals connected to supported PMIC GPIO inputs. The
+	  hardware supports internal pull-up for thermistors and can choose between
+	  a 100k, 30k and 400k pull up using the ADC channels.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called qcom-spmi-adc5-gen3.
+
+config QCOM_SPMI_ADC5_GEN3_DEBUG_LOGGING
+	bool "ADC5 GEN3 Debug Logging"
+	depends on QCOM_SPMI_ADC5_GEN3
+	help
+	  Say yes here to enable debug logging for Qualcomm Technologies, Inc.
+	  ADC5 Gen3 driver.
+
+	  This should be enabled when ADC timeout or ADC conversion faults are
+	  seen and need to be debugged. It will support dumping ADC registers
+	  when these issues occur and then will trigger kernel panic to get the
+	  context of the issue.
+
+config QTI_GLINK_ADC
+	tristate "Qualcomm Technologies Inc. PMIC Glink ADC"
+	depends on QTI_PMIC_GLINK
+	help
+	  This is the IIO PMIC Glink ADC driver for Qualcomm Technologies, Inc.
+	  PMICs.  It supports reading multiple ADC channels using the Glink
+	  interface to communicate with charger firmware.  Channel value
+	  conversion is performed in firmware.  Both converted and raw values
+	  can be read.
+
 config RCAR_GYRO_ADC
 	tristate "Renesas R-Car GyroADC driver"
 	depends on ARCH_RCAR_GEN2 || COMPILE_TEST

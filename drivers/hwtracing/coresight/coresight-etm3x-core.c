@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Description: CoreSight Program Flow Trace driver
  */
@@ -33,6 +34,7 @@
 #include "coresight-etm.h"
 #include "coresight-etm-perf.h"
 #include "coresight-trace-id.h"
+#include "coresight-common.h"
 
 /*
  * Not really modular but using module_param is the easiest way to
@@ -484,7 +486,7 @@ static int etm_enable_perf(struct coresight_device *csdev,
 			   struct perf_event *event)
 {
 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-	int trace_id;
+	int trace_id, ret = 0;
 
 	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
 		return -EINVAL;
@@ -508,8 +510,15 @@ static int etm_enable_perf(struct coresight_device *csdev,
 	}
 	drvdata->traceid = (u8)trace_id;
 
+	coresight_csr_set_etr_atid(csdev, drvdata->traceid, true, etm_event_get_path(event));
+
 	/* And enable it */
-	return etm_enable_hw(drvdata);
+	ret = etm_enable_hw(drvdata);
+	if (ret)
+		coresight_csr_set_etr_atid(csdev, drvdata->traceid, false,
+			etm_event_get_path(event));
+
+	return ret;
 }
 
 static int etm_enable_sysfs(struct coresight_device *csdev)
@@ -524,6 +533,8 @@ static int etm_enable_sysfs(struct coresight_device *csdev)
 	ret = etm_read_alloc_trace_id(drvdata);
 	if (ret < 0)
 		goto unlock_enable_sysfs;
+
+	coresight_csr_set_etr_atid(csdev, drvdata->traceid, true, NULL);
 
 	/*
 	 * Configure the ETM only if the CPU is online.  If it isn't online
@@ -541,8 +552,10 @@ static int etm_enable_sysfs(struct coresight_device *csdev)
 		ret = -ENODEV;
 	}
 
-	if (ret)
+	if (ret) {
+		coresight_csr_set_etr_atid(csdev, drvdata->traceid, false, NULL);
 		etm_release_trace_id(drvdata);
+	}
 
 unlock_enable_sysfs:
 	spin_unlock(&drvdata->spinlock);
@@ -655,6 +668,8 @@ static void etm_disable_sysfs(struct coresight_device *csdev)
 	 */
 	smp_call_function_single(drvdata->cpu, etm_disable_hw, drvdata, 1);
 
+	coresight_csr_set_etr_atid(csdev, drvdata->traceid, false, NULL);
+
 	spin_unlock(&drvdata->spinlock);
 	cpus_read_unlock();
 
@@ -689,6 +704,8 @@ static void etm_disable(struct coresight_device *csdev,
 		break;
 	case CS_MODE_PERF:
 		etm_disable_perf(csdev);
+		coresight_csr_set_etr_atid(csdev, drvdata->traceid, false,
+			etm_event_get_path(event));
 		break;
 	default:
 		WARN_ON_ONCE(mode);
@@ -921,7 +938,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
 
 	etmdrvdata[drvdata->cpu] = drvdata;
 
-	pm_runtime_put(&adev->dev);
+	pm_runtime_put_sync(&adev->dev);
 	dev_info(&drvdata->csdev->dev,
 		 "%s initialized\n", (char *)coresight_get_uci_data(id));
 	if (boot_enable) {

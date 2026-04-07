@@ -80,7 +80,7 @@ config QCOM_CLK_RPM
 
 config QCOM_CLK_SMD_RPM
 	tristate "RPM over SMD based Clock Controller"
-	depends on QCOM_SMD_RPM
+	depends on MSM_RPM_SMD
 	select QCOM_RPMCC
 	help
 	  The RPM (Resource Power Manager) is a dedicated hardware engine for
@@ -741,6 +741,78 @@ config SDX_GCC_75
 	  Say Y if you want to use peripheral devices such as UART,
 	  SPI, I2C, USB, SD/eMMC, PCIe etc.
 
+config SDX_DEBUGCC_75
+	tristate "SDX75 Debug Clock Controller"
+	depends on SDX_GCC_75
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc.
+	  SDX75 devices.
+	  Say Y if you want to support the debug clocks such as clock measurement
+	  functionality.
+
+config SDX_GCC_BAAGHA
+	tristate "SDXBAAGHA Global Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc.
+	  SDXBAAGHA devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, SD/eMMC, PCIe, etc.
+
+config SM_GCC_6150
+	tristate "SM6150 Global Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  SM6150 devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, UFS, SD/eMMC, PCIe, etc.
+
+config SM_CAMCC_6150
+	tristate "SM6150 Camera Clock Controller"
+	select SM_GCC_6150
+	help
+	  Support for the camera clock controller on Qualcomm Technologies, Inc
+	  SM6150 devices.
+	  Say Y if you want to support camera devices and functionality such as
+	  capturing pictures.
+
+config SM_DISPCC_6150
+	tristate "SM6150 Display Clock Controller"
+	select SM_GCC_6150
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc
+	  SM6150 devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash pictures.
+
+config SM_GPUCC_6150
+	tristate "SM6150 Graphics Clock Controller"
+	select SM_GCC_6150
+	help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc.
+	  sm6150 devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D graphics.
+
+config SM_VIDEOCC_6150
+	tristate "SM6150 Video Clock Controller"
+	select SM_GCC_6150
+	help
+	  Support for the video clock controller on Qualcomm Technologies, Inc.
+	  SM6150 devices.
+	  Say Y if you want to support video devices and functionality such as
+	  video encode/decode.
+
+config SM_DEBUGCC_6150
+	tristate "SM6150 Debug Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc
+	  SM6150 devices.
+	  Say Y if you want to support the debug clocks such as
+	  clock measurement functionality.
+
 config SM_CAMCC_6350
 	tristate "SM6350 Camera Clock Controller"
 	depends on ARM64 || COMPILE_TEST
@@ -835,6 +907,55 @@ config SM_DISPCC_8550
 	  Say Y if you want to support display devices and functionality such as
 	  splash screen.
 
+config SM_GCC_4450
+	tristate "SM4450 Global Clock Controller"
+	depends on ARM64 || COMPILE_TEST
+	select QCOM_GDSC
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  SM4450 devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, UFS, SD/eMMC, PCIe, Video, etc.
+
+config SM_CAMCC_4450
+	tristate "SM4450 Camera Clock Controller"
+	depends on ARM64 || COMPILE_TEST
+	select SM_GCC_4450
+	help
+	  Support for the camera clock controller on Qualcomm Technologies, Inc.
+	  SM4450 devices.
+	  Say Y if you want to support camera devices and functionality such as
+	  capturing photos.
+
+config SM_GPUCC_4450
+	tristate "SM4450 Graphics Clock Controller"
+	depends on ARM64 || COMPILE_TEST
+	select SM_GCC_4450
+	help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc.
+	  SM4450 devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D-graphics.
+
+config SM_DISPCC_4450
+	tristate "SM4450 Display Clock Controller"
+	depends on ARM64 || COMPILE_TEST
+	depends on SM_GCC_4450
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc
+	  SM4450 devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash screen
+
+config SM_DEBUGCC_4450
+	tristate "SM4450 Debug Clock Controller"
+	depends on SM_GCC_4450
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc.
+	  SM4450 devices.
+	  Say Y if you want to support the debug clocks such as clock measurement
+	  functionality.
+
 config SM_GCC_6115
 	tristate "SM6115 and SM4250 Global Clock Controller"
 	depends on ARM64 || COMPILE_TEST
@@ -914,6 +1035,12 @@ config SM_GCC_8450
 	  Say Y if you want to use peripheral devices such as UART,
 	  SPI, I2C, USB, SD/UFS, PCIe etc.
 
+config SM_GCC_SUN
+        tristate "SUN Global Clock Controller"
+        help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+
 config SM_GCC_8550
 	tristate "SM8550 Global Clock Controller"
 	depends on ARM64 || COMPILE_TEST
@@ -922,6 +1049,131 @@ config SM_GCC_8550
 	  Support for the global clock controller on SM8550 devices.
 	  Say Y if you want to use peripheral devices such as UART,
 	  SPI, I2C, USB, SD/UFS, PCIe etc.
+
+config SM_GCC_PINEAPPLE
+        tristate "Pineapple Global Clock Controller"
+        help
+          Support for the global clock controller on Qualcomm Technologies, Inc
+          Pineapple devices.
+          Say Y if you want to use peripheral devices such as UART,
+          SPI, I2C, USB, SD/UFS, PCIe etc.
+
+config SM_VIDEOCC_PINEAPPLE
+	tristate "Pineapple Video Clock Controller"
+	depends on SM_GCC_PINEAPPLE
+	help
+	  Support for the video clock controller on Qualcomm Technologies, Inc.
+	  Pineapple devices.
+	  Say Y if you want to support video devices and functionality such as
+	  video encode/decode.
+
+config SM_CAMCC_PINEAPPLE
+	tristate "Pineapple Camera Clock Controller"
+	depends on SM_GCC_PINEAPPLE
+	help
+	  Support for the camera clock controller on Qualcomm Technologies, Inc
+	  Pineapple devices.
+	  Say Y if you want to support camera devices and functionality such as
+	  capturing pictures.
+
+config SM_DISPCC_PINEAPPLE
+	tristate "Pineapple Display Clock Controller"
+	depends on SM_GCC_PINEAPPLE
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc
+	  Pineapple devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash screen.
+
+config SM_DEBUGCC_PINEAPPLE
+	tristate "Pineapple Debug Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc
+	  Pineapple devices.
+	  Say Y if you want to support the debug clocks such as
+	  clock measurement functionality.
+
+config SM_GPUCC_PINEAPPLE
+	tristate "Pineapple Graphics Clock Controller"
+	depends on SM_GCC_PINEAPPLE
+	help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc
+	  Pineapple devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D graphics.
+
+config SM_TCSRCC_PINEAPPLE
+	tristate "Pineapple Top-Level CSR Clock Controller"
+	depends on SM_GCC_PINEAPPLE
+	help
+	  Support for the TCSR clock controller on Qualcomm Technologies, Inc
+	  Pineapple devices.
+	  Say Y if you want to support miscellaneous top-level clocks
+	  such as for the PHY references.
+
+config SM_CAMCC_SUN
+        tristate "SUN Camera Clock Controller"
+        depends on SM_GCC_SUN
+        help
+          Support for the camera clock controller on Qualcomm Technologies, Inc
+          Sun devices.
+          Say Y if you want to support camera devices and functionality such as
+          capturing pictures.
+
+config SM_EVACC_SUN
+	tristate "SUN EVA Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the EVA clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support EVA devices to get better
+	  visual analysis.
+
+config SM_GPUCC_SUN
+	tristate "SUN Graphics Clock Controller"
+        depends on SM_GCC_SUN
+        help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D graphics.
+
+config SM_DISPCC_SUN
+	tristate "SUN Display Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash screen.
+
+config SM_CAMBISTMCLKCC_SUN
+	tristate "SUN CAMBISTMCLK Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the CAMBISTMCLK clock controller on Qualcomm Technologies,
+	  Inc Sun devices.
+	  Say Y if you want to support camera devices for a better low-latency
+	  clock.
+
+config SM_TCSRCC_SUN
+	tristate "SUN Top-Level CSR Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the TCSR clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support miscellaneous top-level clocks
+	  such as for the PHY references.
+
+config SM_DEBUGCC_SUN
+	tristate "Sun Debug Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc
+	  Sun devices.
+	  Say Y if you want to support the debug clocks such as clock
+	  measurement functionality.
 
 config SM_GPUCC_6115
 	tristate "SM6115 Graphics Clock Controller"
@@ -1051,6 +1303,14 @@ config SM_VIDEOCC_8550
 	  Support for the video clock controller on Qualcomm Technologies, Inc.
 	  SM8550 devices.
 	  Say Y if you want to support video devices and functionality such as
+
+config SM_VIDEOCC_SUN
+	tristate "SUN Video Clock Controller"
+	depends on SM_GCC_SUN
+	help
+	  Support for the video clock controller on Qualcomm Technologies, Inc
+	  SUN devices.
+	  Say Y if you want to support video devices and functionality such as
 	  video encode/decode.
 
 config SPMI_PMIC_CLKDIV
@@ -1091,6 +1351,16 @@ config CLK_GFM_LPASS_SM8250
 	  Support for the Glitch Free Mux (GFM) Low power audio
           subsystem (LPASS) clocks found on SM8250 SoCs.
 
+config QCOM_GDSC_REGULATOR
+	tristate "GDSC regulator driver"
+	depends on COMMON_CLK_QCOM
+	help
+	  This driver supports globally distributed switch controller (GDSC)
+	  devices in regulator framework.
+	  Say Y if you want to support clients using regulator framework APIs
+	  to control GDSCs.
+
+
 config SM_VIDEOCC_8450
 	tristate "SM8450 Video Clock Controller"
 	depends on ARM64 || COMPILE_TEST
@@ -1101,4 +1371,221 @@ config SM_VIDEOCC_8450
 	  SM8450 devices.
 	  Say Y if you want to support video devices and functionality such as
 	  video encode/decode.
+
+config SM_GCC_PARROT
+	tristate "PARROT Global Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  PARROT devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, UFS, SD/eMMC, PCIe, etc.
+
+config SM_DISPCC_PARROT
+	tristate "PARROT Display Clock Controller"
+	select SM_GCC_PARROT
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc
+	  PARROT devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash screen.
+
+config SM_GPUCC_PARROT
+	tristate "PARROT Graphics Clock Controller"
+	select SM_GCC_PARROT
+	help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc.
+	  PARROT devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D graphics.
+
+config SM_CAMCC_PARROT
+	tristate "PARROT Camera Clock Controller"
+	select SM_GCC_PARROT
+	help
+	  Support for the camera clock controller on Qualcomm Technologies, Inc.
+	  PARROT devices.
+	  Say Y if you want to support camera devices and functionality such as
+	  capturing pictures.
+
+config SM_VIDEOCC_PARROT
+	tristate "PARROT Video Clock Controller"
+	select SM_GCC_PARROT
+	help
+	  Support for the video clock controller on Qualcomm Technologies, Inc.
+	  PARROT devices.
+	  Say Y if you want to support video devices and functionality such as
+	  video encode/decode.
+
+config SM_DEBUGCC_PARROT
+	tristate "PARROT Debug Clock Controller"
+	depends on SM_GCC_PARROT
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc.
+	  PARROT devices.
+	  Say Y if you want to support the debug clocks such as clock measurement
+	  functionality.
+
+config SM_GCC_TUNA
+	tristate "Tuna Global Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  Tuna devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, SD/UFS, PCIe etc.
+
+config SM_TCSRCC_TUNA
+	tristate "Tuna Top-Level CSR Clock Controller"
+	depends on SM_GCC_TUNA || SM_GCC_KERA
+	help
+	  Support for the TCSR clock controller on Qualcomm Technologies, Inc
+	  Tuna devices.
+	  Say Y if you want to support miscellaneous top-level clocks
+	  such as for the PHY references.
+
+config SDW_GCC_MONACO
+	tristate "MONACO Global Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc.
+	  MONACO devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, SD/eMMC, etc.
+
+config SDW_GPUCC_MONACO
+	tristate "MONACO Graphics Clock Controller"
+	select SDW_GCC_MONACO
+	help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc.
+	  MONACO devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D graphics.
+
+config SDW_DISPCC_MONACO
+	tristate "MONACO Display Clock Controller"
+	depends on SDW_GCC_MONACO
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc.
+	  MONACO devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash screen.
+
+config SDW_DEBUGCC_MONACO
+	tristate "MONACO Debug Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc
+	  MONACO devices.
+	  Say Y if you want to support the debug clocks such as
+	  clock measurement functionality.
+
+config SM_VIDEOCC_TUNA
+	tristate "TUNA Video Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the video clock controller on Qualcomm Technologies, Inc.
+	  TUNA devices.
+	  Say Y if you want to support video devices and functionality such as
+	  video encode/decode.
+
+config SM_EVACC_TUNA
+	tristate "TUNA EVA Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the EVA clock controller on Qualcomm Technologies, Inc
+	  TUNA devices.
+	  Say Y if you want to support EVA devices to get better
+	  visual analysis.
+
+config SM_GPUCC_TUNA
+	tristate "TUNA Graphics Clock Controller"
+        depends on SM_GCC_TUNA
+        help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc
+	  Tuna devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D graphics.
+
+config SM_GCC_KERA
+	tristate "Kera Global Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the global clock controller on Qualcomm Technologies, Inc
+	  Kera devices.
+	  Say Y if you want to use peripheral devices such as UART, SPI, I2C,
+	  USB, SD/UFS, PCIe etc.
+
+config SM_CAMCC_TUNA
+	tristate "TUNA Camera Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the camera clock controller on Qualcomm Technologies, Inc
+	  Tuna devices.
+	  Say Y if you want to support camera devices and functionality such as
+	  capturing pictures.
+
+config SM_CAMBISTMCLKCC_TUNA
+	tristate "TUNA CAMBISTMCLK Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the CAMBISTMCLK clock controller on Qualcomm Technologies,
+	  Inc Tuna devices.
+	  Say Y if you want to support camera devices for a better low-latency
+	  clock.
+
+config SM_DISPCC_TUNA
+	tristate "TUNA Display Clock Controller"
+	depends on SM_GCC_TUNA
+	help
+	  Support for the display clock controller on Qualcomm Technologies, Inc
+	  Tuna devices.
+	  Say Y if you want to support display devices and functionality such as
+	  splash screen.
+
+config SM_DEBUGCC_TUNA
+	tristate "Tuna Debug Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc
+	  Tuna devices.
+	  Say Y if you want to support the debug clocks such as clock
+	  measurement functionality.
+
+config SM_CAMCC_KERA
+	tristate "KERA Camera Clock Controller"
+	depends on SM_GCC_KERA
+	help
+	  Support for the camera clock controller on Qualcomm Technologies, Inc
+	  Kera devices.
+	  Say Y if you want to support camera devices and functionality such as
+	  capturing pictures.
+
+config SDX_DEBUGCC_BAAGHA
+	tristate "SDXBAAGHA Debug Clock Controller"
+	select SDX_GCC_BAAGHA
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc
+	  SDXBAAGHA devices.
+	  Say Y if you want to support the debug clocks such as
+	  clock measurement functionality.
+
+config SM_GPUCC_KERA
+	tristate "KERA Graphics Clock Controller"
+        depends on SM_GCC_KERA
+        help
+	  Support for the graphics clock controller on Qualcomm Technologies, Inc
+	  Kera devices.
+	  Say Y if you want to support graphics controller devices and
+	  functionality such as 3D graphics.
+
+config SM_DEBUGCC_KERA
+	tristate "Kera Debug Clock Controller"
+	depends on COMMON_CLK_QCOM
+	help
+	  Support for the debug clock controller on Qualcomm Technologies, Inc
+	  Kera devices.
+	  Say Y if you want to support the debug clocks such as clock
+	  measurement functionality.
+
 endif

@@ -5,6 +5,7 @@
  * Copyright (C) 2016 Linaro Ltd
  * Copyright (C) 2015 Sony Mobile Communications Inc
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/device.h>
@@ -178,11 +179,17 @@ void *qcom_mdt_read_metadata(const struct firmware *fw, size_t *data_len,
 	ehdr = (struct elf32_hdr *)fw->data;
 	phdrs = (struct elf32_phdr *)(fw->data + ehdr->e_phoff);
 
-	if (ehdr->e_phnum < 2)
+	if (ehdr->e_phnum < 2 || ehdr->e_phoff > fw->size ||
+	    (sizeof(phdrs) * ehdr->e_phnum > fw->size - ehdr->e_phoff))
 		return ERR_PTR(-EINVAL);
 
 	if (phdrs[0].p_type == PT_LOAD)
 		return ERR_PTR(-EINVAL);
+
+	if (((size_t)(phdrs + ehdr->e_phnum)) > ((size_t)ehdr + fw->size)) {
+		dev_err(dev, "Invalid phdrs access: %s\n", fw_name);
+		return ERR_PTR(-EINVAL);
+	}
 
 	for (i = 1; i < ehdr->e_phnum; i++) {
 		if ((phdrs[i].p_flags & QCOM_MDT_TYPE_MASK) == QCOM_MDT_TYPE_HASH) {
@@ -237,12 +244,13 @@ EXPORT_SYMBOL_GPL(qcom_mdt_read_metadata);
  * @pas_id:	PAS identifier
  * @mem_phys:	physical address of allocated memory region
  * @ctx:	PAS metadata context, to be released by caller
+ * @dma_phys_below_32b: True, if memory need to be allocated from lower 4G
  *
  * Returns 0 on success, negative errno otherwise.
  */
 int qcom_mdt_pas_init(struct device *dev, const struct firmware *fw,
 		      const char *fw_name, int pas_id, phys_addr_t mem_phys,
-		      struct qcom_scm_pas_metadata *ctx)
+		      struct qcom_scm_pas_metadata *ctx, bool dma_phys_below_32b)
 {
 	const struct elf32_phdr *phdrs;
 	const struct elf32_phdr *phdr;
@@ -284,7 +292,8 @@ int qcom_mdt_pas_init(struct device *dev, const struct firmware *fw,
 		goto out;
 	}
 
-	ret = qcom_scm_pas_init_image(pas_id, metadata, metadata_len, ctx);
+	ret = qcom_scm_pas_init_image(pas_id, metadata, metadata_len, ctx,
+				      (dma_phys_below_32b) ? dev : NULL);
 	kfree(metadata);
 	if (ret) {
 		/* Invalid firmware metadata */
@@ -297,6 +306,10 @@ int qcom_mdt_pas_init(struct device *dev, const struct firmware *fw,
 		if (ret) {
 			/* Unable to set up relocation */
 			dev_err(dev, "error %d setting up firmware %s\n", ret, fw_name);
+			if (dma_phys_below_32b)
+				qcom_scm_pas_shutdown(pas_id);
+			qcom_scm_pas_metadata_release(ctx,
+						      (dma_phys_below_32b) ? dev : NULL);
 			goto out;
 		}
 	}
@@ -458,7 +471,7 @@ int qcom_mdt_load(struct device *dev, const struct firmware *fw,
 {
 	int ret;
 
-	ret = qcom_mdt_pas_init(dev, fw, firmware, pas_id, mem_phys, NULL);
+	ret = qcom_mdt_pas_init(dev, fw, firmware, pas_id, mem_phys, NULL, false);
 	if (ret)
 		return ret;
 

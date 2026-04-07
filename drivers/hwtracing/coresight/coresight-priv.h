@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2012, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CORESIGHT_PRIV_H
@@ -75,6 +76,22 @@ extern ssize_t coresight_simple_show_pair(struct device *_dev,
 extern const u32 coresight_barrier_pkt[4];
 #define CORESIGHT_BARRIER_PKT_SIZE (sizeof(coresight_barrier_pkt))
 
+struct pm_config {
+	struct cpumask	powered_cpus;
+	struct cpumask	*pd_cpumask;
+	struct cpumask	online_cpus;
+	struct list_head	link;
+	bool		hw_powered;
+	bool		pm_enable;
+};
+
+struct delay_probe_arg {
+	struct amba_device	*adev;
+	struct cpumask		*cpumask;
+	struct list_head	link;
+	const struct amba_id	*id;
+};
+
 enum etm_addr_type {
 	ETM_ADDR_TYPE_NONE,
 	ETM_ADDR_TYPE_SINGLE,
@@ -133,6 +150,7 @@ int coresight_enable_path(struct list_head *path, enum cs_mode mode,
 struct coresight_device *coresight_get_sink(struct list_head *path);
 struct coresight_device *
 coresight_get_enabled_sink(struct coresight_device *source);
+struct list_head *coresight_get_path(struct coresight_device *csdev);
 struct coresight_device *coresight_get_sink_by_id(u32 id);
 struct coresight_device *
 coresight_find_default_sink(struct coresight_device *csdev);
@@ -164,6 +182,8 @@ struct cti_assoc_op {
 
 extern void coresight_set_cti_ops(const struct cti_assoc_op *cti_op);
 extern void coresight_remove_cti_ops(void);
+
+bool of_coresight_secure_node(struct coresight_device *csdev);
 
 /*
  * Macros and inline functions to handle CoreSight UCI data and driver

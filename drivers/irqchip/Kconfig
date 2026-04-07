@@ -430,6 +430,17 @@ config GOLDFISH_PIC
          Say yes here to enable Goldfish interrupt controller driver used
          for Goldfish based virtual platforms.
 
+config MPM_LEGACY
+	tristate "MPM_LEGACY"
+	depends on ARCH_QCOM
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_HIERARCHY
+	help
+	  MSM Power Manager driver to manage and configure wakeup
+	  IRQs for Legacy Qualcomm Technologies Inc (QTI) mobile chips.
+	  Say yes here to enable the MSM Power Manager interrupt
+	  controller to use as a wakeup interrupt controller.
+
 config QCOM_PDC
 	tristate "QCOM PDC"
 	depends on ARCH_QCOM
@@ -437,6 +448,16 @@ config QCOM_PDC
 	help
 	  Power Domain Controller driver to manage and configure wakeup
 	  IRQs for Qualcomm Technologies Inc (QTI) mobile chips.
+
+config QCOM_SHOW_RESUME_IRQ
+        tristate "Enable logging of interrupts that could have caused resume"
+        depends on PM
+        depends on ARM_GIC || ARM_GIC_V3
+        help
+          This option logs wake up interrupts that have triggered just before
+          the resume loop unrolls. It helps to debug to know any unnecessary
+          wake up interrupts that causes system to come out of low power modes.
+          Say Y if you want to debug why the system resumed.
 
 config QCOM_MPM
 	tristate "QCOM MPM"

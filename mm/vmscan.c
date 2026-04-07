@@ -2256,11 +2256,6 @@ activate_locked:
 			folio_free_swap(folio);
 		VM_BUG_ON_FOLIO(folio_test_active(folio), folio);
 		if (!folio_test_mlocked(folio)) {
-			bool skip = false;
-
-			trace_android_vh_folio_skip_activate(folio, &skip);
-			if (skip)
-				goto keep_locked;
 			int type = folio_is_file_lru(folio);
 			folio_set_active(folio);
 			stat->nr_activate[type] += nr_pages;
@@ -2880,15 +2875,10 @@ static void shrink_active_list(unsigned long nr_to_scan,
 			 * so we ignore them here.
 			 */
 			if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio)) {
-				bool bypass = false;
-
 				trace_android_vh_folio_trylock_clear(folio);
 				nr_rotated += folio_nr_pages(folio);
-				trace_android_vh_folio_trylock_clear_bypass(folio, &bypass);
-				if (!bypass) {
-					list_add(&folio->lru, &l_active);
-					continue;
-				}
+				list_add(&folio->lru, &l_active);
+				continue;
 			}
 		}
 		trace_android_vh_folio_trylock_clear(folio);
@@ -3759,9 +3749,7 @@ static bool should_skip_mm(struct mm_struct *mm, struct lru_gen_mm_walk *walk)
 	if (size < MIN_LRU_BATCH)
 		return true;
 
-	mmgrab(mm);
-
-	return false;
+	return !mmget_not_zero(mm);
 }
 
 static bool iterate_mm_list(struct lruvec *lruvec, struct lru_gen_mm_walk *walk,
@@ -3825,7 +3813,7 @@ done:
 		reset_bloom_filter(lruvec, walk->max_seq + 1);
 
 	if (*iter)
-		mmdrop(*iter);
+		mmput_async(*iter);
 
 	*iter = mm;
 

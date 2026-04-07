@@ -8,6 +8,17 @@
 #	Santosh Yaraganavi <santosh.sy@samsung.com>
 #	Vinayak Holikatti <h.vinayak@samsung.com>
 
+config UFS_DBG
+	bool "Universal Flash Storage Debug Mode"
+	depends on SCSI_UFSHCD
+	help
+	This selects the debug mode for ufs vendor driver.
+	  Enables tracing for QTI ufs driver.
+	  This also enables ftrace for ufs core and SCSI.
+	  Enabling this would have an adverse performance impact on disk IO.
+
+	  If unsure, say N.
+
 config SCSI_UFSHCD_PCI
 	tristate "PCI bus based UFS Controller support"
 	depends on PCI
@@ -142,3 +153,14 @@ config SCSI_UFS_SPRD
 
 	  Select this if you have UFS controller on Unisoc chipset.
 	  If unsure, say N.
+
+config SCSI_UFS_CRYPTO_QTI
+	tristate "UFS Crypto Engine Support for QCOM Hardware Wrapped Keys"
+	depends on SCSI_UFS_CRYPTO && SCSI_UFS_QCOM && QCOM_INLINE_CRYPTO_ENGINE
+	help
+	  Enable Crypto Engine Support in UFS for QCOM chipsets supporting
+	  wrapped keys. This is explicitly required until wrapped keys support
+	  for QCOM chipsets is part of Linux upstream.
+
+	  Select this to enable QCOM Hardware Wrapped Key support for the
+	  ICE hardware.

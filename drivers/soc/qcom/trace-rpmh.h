@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #if !defined(_TRACE_RPMH_H) || defined(TRACE_HEADER_MULTI_READ)
@@ -74,6 +75,70 @@ TRACE_EVENT(rpmh_send_msg,
 		  __entry->n,
 		  __entry->hdr,
 		  __entry->addr, __entry->data, __entry->wait)
+);
+
+TRACE_EVENT(rpmh_solver_set,
+
+	TP_PROTO(struct rsc_drv *d, bool set),
+
+	TP_ARGS(d, set),
+
+	TP_STRUCT__entry(
+			 __string(name, d->name)
+			 __field(bool, set)
+	),
+
+	TP_fast_assign(
+		       __assign_str(name, d->name);
+		       __entry->set = set;
+	),
+
+	TP_printk("%s: solver mode set: %d",
+		  __get_str(name), __entry->set)
+);
+
+TRACE_EVENT(rpmh_switch_channel,
+
+	TP_PROTO(struct rsc_drv *d, int ch, int ret),
+
+	TP_ARGS(d, ch, ret),
+
+	TP_STRUCT__entry(
+			 __string(name, d->name)
+			 __field(int, ch)
+			 __field(int, ret)
+	),
+
+	TP_fast_assign(
+		       __assign_str(name, d->name);
+		       __entry->ch = ch;
+		       __entry->ret = ret;
+	),
+
+	TP_printk("%s: channel switched to: %d ret: %d",
+		  __get_str(name), __entry->ch, __entry->ret)
+);
+
+TRACE_EVENT(rpmh_drv_enable,
+
+	TP_PROTO(struct rsc_drv *d, bool enable, int ret),
+
+	TP_ARGS(d, enable, ret),
+
+	TP_STRUCT__entry(
+			 __string(name, d->name)
+			 __field(bool, enable)
+			 __field(int, ret)
+	),
+
+	TP_fast_assign(
+		       __assign_str(name, d->name);
+		       __entry->enable = enable;
+		       __entry->ret = ret;
+	),
+
+	TP_printk("%s: drv enable: %d ret: %d",
+		  __get_str(name), __entry->enable, __entry->ret)
 );
 
 #endif /* _TRACE_RPMH_H */

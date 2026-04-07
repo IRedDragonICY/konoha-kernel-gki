@@ -67,6 +67,9 @@
 #include <linux/time_namespace.h>
 #include <linux/user_events.h>
 #include <linux/page_size_compat.h>
+#ifdef CONFIG_KSU_SUSFS
+#include <linux/susfs_def.h>
+#endif
 
 #ifndef __GENKSYMS__
 #include <linux/dma-buf.h>
@@ -1925,6 +1928,17 @@ out_unmark:
 	return retval;
 }
 
+#ifdef CONFIG_KSU_SUSFS
+extern bool ksu_execveat_hook __read_mostly;
+extern bool ksu_su_compat_enabled __read_mostly;
+extern bool susfs_is_sdcard_android_data_decrypted __read_mostly;
+extern bool __ksu_is_allow_uid_for_current(uid_t uid);
+extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
+			void *envp, int *flags);
+extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv,
+				void *envp, int *flags);
+#endif
+
 static int do_execveat_common(int fd, struct filename *filename,
 			      struct user_arg_ptr argv,
 			      struct user_arg_ptr envp,
@@ -1935,6 +1949,20 @@ static int do_execveat_common(int fd, struct filename *filename,
 
 	if (IS_ERR(filename))
 		return PTR_ERR(filename);
+
+#ifdef CONFIG_KSU_SUSFS
+	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
+		goto orig_flow;
+	}
+
+	if (unlikely(ksu_execveat_hook || !susfs_is_sdcard_android_data_decrypted)) {
+		ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+	} else if ((__ksu_is_allow_uid_for_current(current_uid().val))) {
+		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+	}
+
+orig_flow:
+#endif
 
 	/*
 	 * We move the actual failure in case of RLIMIT_NPROC excess from

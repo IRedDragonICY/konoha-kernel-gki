@@ -25,7 +25,7 @@ static int deassert_pshold(struct notifier_block *nb, unsigned long action,
 
 static struct notifier_block restart_nb = {
 	.notifier_call = deassert_pshold,
-	.priority = 128,
+	.priority = 200,
 };
 
 static void do_msm_poweroff(void)

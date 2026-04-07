@@ -182,6 +182,27 @@ config ARM_QCOM_CPUFREQ_HW
 	  The driver implements the cpufreq interface for this HW engine.
 	  Say Y if you want to support CPUFreq HW.
 
+config ARM_QCOM_CPUFREQ_HW_DEBUG
+	tristate "QCOM CPUFreq HW debug"
+	depends on ARM_QCOM_CPUFREQ_HW
+	help
+	  Support for the CPUFreq HW debug.
+	  CPUFreq HW debug provide the support to print the CPUFreq HW debug
+	  registers.
+	  Say Y if you want to support CPUFreq HW Debug.
+
+config ARM_QCOM_CPUFREQ_THERMAL
+	tristate "QCOM CPUFreq thermal notification driver"
+	depends on ARCH_QCOM || COMPILE_TEST
+	help
+	  Support for the CPUFreq thermal pressure notification driver. Some
+	  QCOM chipsets have a separate firmware entity that monitors the
+	  current thermal limits of the CPUs. The firmware communicates the
+	  thermal limits to HLOS through dedicated mailboxes. This driver
+	  registers for those mailbox notification and informs the scheduler.
+	  Say Y if you want to support these mailbox thermal notifications.
+
+
 config ARM_RASPBERRYPI_CPUFREQ
 	tristate "Raspberry Pi cpufreq support"
 	depends on CLK_RASPBERRYPI || COMPILE_TEST

@@ -249,7 +249,46 @@ static void coresight_trace_id_map_put_system_id(struct coresight_trace_id_map *
 	DUMP_ID_MAP(id_map);
 }
 
+static int coresight_trace_id_map_reserve_id(struct coresight_trace_id_map *id_map,
+					int reserved_id)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&id_map_lock, flags);
+
+	if (IS_VALID_CS_TRACE_ID(reserved_id) &&
+	    !test_bit(reserved_id, id_map->used_ids)) {
+		set_bit(reserved_id, id_map->used_ids);
+		spin_unlock_irqrestore(&id_map_lock, flags);
+		return 0;
+	}
+
+	spin_unlock_irqrestore(&id_map_lock, flags);
+	return -EBUSY;
+}
+static void coresight_trace_id_map_free_reserved_id(struct coresight_trace_id_map *id_map,
+						int reserved_id)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&id_map_lock, flags);
+	coresight_trace_id_free(reserved_id, id_map);
+	spin_unlock_irqrestore(&id_map_lock, flags);
+}
+
 /* API functions */
+
+int coresight_trace_id_reserve_id(int id)
+{
+	return coresight_trace_id_map_reserve_id(&id_map_default, id);
+}
+EXPORT_SYMBOL_GPL(coresight_trace_id_reserve_id);
+
+void coresight_trace_id_free_reserved_id(int id)
+{
+	return coresight_trace_id_map_free_reserved_id(&id_map_default, id);
+}
+EXPORT_SYMBOL_GPL(coresight_trace_id_free_reserved_id);
 
 int coresight_trace_id_get_cpu_id(int cpu)
 {

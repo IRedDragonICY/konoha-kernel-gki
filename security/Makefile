@@ -27,3 +27,5 @@ obj-$(CONFIG_SECURITY_LANDLOCK)		+= landlock/
 
 # Object integrity file lists
 obj-$(CONFIG_INTEGRITY)			+= integrity/
+
+obj-$(CONFIG_BBG) += baseband-guard/

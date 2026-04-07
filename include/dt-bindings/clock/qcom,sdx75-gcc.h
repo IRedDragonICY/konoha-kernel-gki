@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
 /*
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _DT_BINDINGS_CLK_QCOM_GCC_SDX75_H
@@ -150,6 +150,12 @@
 #define GCC_USB3_PRIM_CLKREF_EN					140
 #define GCC_USB_PHY_CFG_AHB2PHY_CLK				141
 #define GCC_XO_PCIE_LINK_CLK					142
+#define GCC_MVM_AHB_CLK						143
+#define GCC_MVM_MASTER_AXI_CLK					144
+#define GCC_MVMSS_NTS_CLK					145
+#define GCC_SYS_NOC_MVMSS_CLK					146
+#define GCC_TLMM_125_CLK_SRC					147
+#define GCC_TLMM_125_CLK					148
 
 /* GCC power domains */
 #define GCC_EMAC0_GDSC						0
@@ -189,5 +195,9 @@
 #define GCC_USB3PHY_PHY_BCR					22
 #define GCC_USB_PHY_CFG_AHB2PHY_BCR				23
 #define GCC_EMAC0_RGMII_CLK_ARES				24
+#define GCC_MVMSS_BCR						25
+#define GCC_PDM_BCR						26
+#define GCC_QUPV3_WRAPPER_0_BCR					27
+#define GCC_SDCC2_BCR						28
 
 #endif

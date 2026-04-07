@@ -427,8 +427,6 @@ void dma_direct_sync_sg_for_device(struct device *dev,
 			arch_sync_dma_for_device(paddr, sg->length,
 					dir);
 	}
-	if (!dev_is_dma_coherent(dev))
-		arch_sync_dma_flush();
 }
 #endif
 
@@ -455,10 +453,8 @@ void dma_direct_sync_sg_for_cpu(struct device *dev,
 			arch_dma_mark_clean(paddr, sg->length);
 	}
 
-	if (!dev_is_dma_coherent(dev)) {
-		arch_sync_dma_flush();
+	if (!dev_is_dma_coherent(dev))
 		arch_sync_dma_for_cpu_all();
-	}
 }
 
 /*
@@ -470,19 +466,14 @@ void dma_direct_unmap_sg(struct device *dev, struct scatterlist *sgl,
 {
 	struct scatterlist *sg;
 	int i;
-	bool need_sync = false;
 
 	for_each_sg(sgl,  sg, nents, i) {
-		if (sg_dma_is_bus_address(sg)) {
+		if (sg_dma_is_bus_address(sg))
 			sg_dma_unmark_bus_address(sg);
-		} else {
-			need_sync = true;
+		else
 			dma_direct_unmap_page(dev, sg->dma_address,
-					      sg_dma_len(sg), dir, attrs, false);
-		}
+					      sg_dma_len(sg), dir, attrs);
 	}
-	if (need_sync && !dev_is_dma_coherent(dev))
-		arch_sync_dma_flush();
 }
 #endif
 
@@ -493,7 +484,6 @@ int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
 	enum pci_p2pdma_map_type map;
 	struct scatterlist *sg;
 	int i, ret;
-	bool need_sync = false;
 
 	for_each_sg(sgl, sg, nents, i) {
 		if (is_pci_p2pdma_page(sg_page(sg))) {
@@ -515,9 +505,8 @@ int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
 			}
 		}
 
-		need_sync = true;
 		sg->dma_address = dma_direct_map_page(dev, sg_page(sg),
-				sg->offset, sg->length, dir, attrs, false);
+				sg->offset, sg->length, dir, attrs);
 		if (sg->dma_address == DMA_MAPPING_ERROR) {
 			ret = -EIO;
 			goto out_unmap;
@@ -525,8 +514,6 @@ int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
 		sg_dma_len(sg) = sg->length;
 	}
 
-	if (need_sync && !dev_is_dma_coherent(dev))
-		arch_sync_dma_flush();
 	return nents;
 
 out_unmap:

@@ -783,6 +783,9 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 				facility = LOG_FACILITY(u);
 			endp++;
 			line = endp;
+			if (strstr(line, "healthd") ||
+				strncmp(line, "logd: Skipping", sizeof("logd: Skipping")))
+				return ret;
 		}
 	}
 

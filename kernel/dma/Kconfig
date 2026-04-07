@@ -79,9 +79,6 @@ config ARCH_HAS_DMA_PREP_COHERENT
 config ARCH_HAS_FORCE_DMA_UNENCRYPTED
 	bool
 
-config ARCH_HAS_BATCHED_DMA_SYNC
-	bool
-
 #
 # Select this option if the architecture assumes DMA devices are coherent
 # by default.
@@ -121,6 +118,18 @@ config DMA_RESTRICTED_POOL
 	  For more information see
 	  <Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt>
 	  and <kernel/dma/swiotlb.c>.
+	  If unsure, say "n".
+
+config SWIOTLB_NONLINEAR
+	bool "Allow swiotlb to use non-linear memory as bounce buffers"
+	depends on SWIOTLB
+	help
+	  This allows swiotlb driver to work with memory regions where
+	  physical to virtual address translations can't be done using APIs
+	  such as phys_to_virt. These could be reserved memory regions that
+	  are not mapped by default or could be seen as "device" memory
+	  accessed via ioremap().
+
 	  If unsure, say "n".
 
 #

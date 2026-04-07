@@ -1,6 +1,7 @@
 #ifndef __QCOM_RPROC_H__
 #define __QCOM_RPROC_H__
 
+#include <linux/remoteproc.h>
 struct notifier_block;
 
 /**
@@ -27,7 +28,10 @@ struct qcom_ssr_notify_data {
 #if IS_ENABLED(CONFIG_QCOM_RPROC_COMMON)
 
 void *qcom_register_ssr_notifier(const char *name, struct notifier_block *nb);
+void *qcom_register_early_ssr_notifier(const char *name, struct notifier_block *nb);
+int qcom_unregister_early_ssr_notifier(void *notify, struct notifier_block *nb);
 int qcom_unregister_ssr_notifier(void *notify, struct notifier_block *nb);
+int rproc_set_state(struct rproc *rproc, bool state);
 
 #else
 
@@ -37,12 +41,27 @@ static inline void *qcom_register_ssr_notifier(const char *name,
 	return NULL;
 }
 
+static inline void *qcom_register_early_ssr_notifier(const char *name, struct notifier_block *nb)
+{
+	return NULL;
+}
+
+static inline int qcom_unregister_early_ssr_notifier(void *notify,
+					       struct notifier_block *nb)
+{
+	return 0;
+}
+
 static inline int qcom_unregister_ssr_notifier(void *notify,
 					       struct notifier_block *nb)
 {
 	return 0;
 }
 
+static inline int rproc_set_state(struct rproc *rproc, bool state)
+{
+	return 0;
+}
 #endif
 
 #endif

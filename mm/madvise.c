@@ -1645,7 +1645,6 @@ int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, int beh
 	size_t len;
 	struct blk_plug plug;
 	struct madvise_behavior madv_behavior = {.behavior = behavior};
-	bool bypass = false;
 
 	if (!madvise_behavior_valid(behavior))
 		return -EINVAL;
@@ -1678,11 +1677,6 @@ int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, int beh
 		return ret;
 	}
 #endif
-
-	trace_android_vh_mm_do_madvise_bypass(mm, start, len, behavior,
-					      &error, &bypass);
-	if (bypass)
-		return error;
 
 	start = get_untagged_addr(mm, start);
 	end = start + len;

@@ -251,6 +251,96 @@ config ARCH_QCOM
 	help
 	  This enables support for the ARMv8 based Qualcomm chipsets.
 
+config ARCH_QTI_VM
+       bool "Enable Virtual Machines Support for Qualcomm Technologies, Inc."
+       depends on ARCH_QCOM
+       help
+         This enables support for the Qualcomm Technologies, Inc.'s
+         Virtual Machines. If you wish to build a kernel that doesn't
+         require VM support or if you are unsure,
+         say 'N' here.
+
+config ARCH_SDXKOVA
+        bool "Enable support for Qualcomm Technologies, Inc. SDXKOVA"
+        depends on ARCH_QCOM
+        help
+          This enables support for Qualcomm Technologies, Inc.
+          SDXKOVA chipset. Say 'Y' for SDXPINN chipset. If you do not
+          wish to build a kernel that runs on this chipset or if you
+          are unsure, say 'N' here.
+
+config ARCH_SUN
+	bool "Enable support for Qualcomm Technologies, Inc. Sun"
+	depends on ARCH_QCOM
+	help
+	  This enables support for Qualcomm Technologies, Inc. Sun
+	  chipset. If you do not wish to build a kernel that runs on this
+	  chipset or if you are unsure, say 'N' here.
+
+config ARCH_TUNA
+	bool "Enable support for Qualcomm Technologies, Inc. Tuna"
+	depends on ARCH_QCOM
+	help
+	  This enables support for Qualcomm Technologies, Inc. Tuna
+	  chipset. If you do not wish to build a kernel that runs on this
+	  chipset or if you are unsure, say 'N' here.
+
+config ARCH_KERA
+	bool "Enable support for Qualcomm Technologies, Inc. Kera"
+	depends on ARCH_QCOM
+	help
+	  This enables support for Qualcomm Technologies, Inc. Kera
+	  chipset. If you do not wish to build a kernel that runs on this
+	  chipset or if you are unsure, say 'N' here.
+
+config ARCH_KERA_LE
+	bool "Enable support for Qualcomm Technologies, Inc. Kera-le"
+	depends on ARCH_KERA
+	help
+	  This enables support for Qualcomm Technologies, Inc. Kera
+	  chipset LE platform. If you do not wish to build a kernel
+	  that runs on this chipset and this platform or if you are
+	  unsure, say 'N' here.
+
+config ARCH_PINEAPPLE
+	bool "Enable support for Qualcomm Technologies, Inc. Pineapple"
+	depends on ARCH_QCOM
+	help
+	  This enables support for Qualcomm Technologies, Inc. Pineapple
+	  chipset. If you do not wish to build a kernel that runs on this
+	  chipset or if you are unsure, say 'N' here.
+
+config ARCH_X1E80100
+        bool "Enable Support for Qualcomm Technologies, Inc. X1E80100"
+        depends on ARCH_QCOM
+        help
+          This enables support for the Qualcomm Technologies, Inc.'s
+          X1E80100 chipset. If you do not wish to build a kernel that
+          runs on this chipset or if you are unsure, say 'N' here.
+
+config ARCH_PARROT
+	bool "Enable Support for Qualcomm Technologies, Inc. PARROT"
+	depends on ARCH_QCOM
+	help
+	  This enables support for the Qualcomm Technologies, Inc.'s
+	  PARROT chipset. If you do not wish to build a kernel that
+	  runs on this chipset or if you are unsure, say 'N' here.
+
+config ARCH_RAVELIN
+        bool "Enable Support for Qualcomm Technologies, Inc. RAVELIN"
+        depends on ARCH_QCOM
+        help
+          This enables support for the Qualcomm Technologies, Inc.'s
+          RAVELIN chipset. If you do not wish to build a kernel that
+
+config ARCH_MONACO
+        bool "Enable Support for Qualcomm Technologies, Inc. MONACO"
+        depends on ARCH_QCOM
+        help
+          This enables support for the Qualcomm Technologies, Inc.'s
+          MONACO chipset. If you do not wish to build a kernel that
+          runs on this chipset or if you are unsure, say 'N' here.
+
 config ARCH_REALTEK
 	bool "Realtek Platforms"
 	select RESET_CONTROLLER
@@ -327,6 +417,14 @@ config ARCH_SPRD
 	bool "Spreadtrum SoC platform"
 	help
 	  Support for Spreadtrum ARM based SoCs
+
+config ARCH_SM6150
+       bool "Enable Support for Qualcomm Technologies, Inc. SM6150"
+       depends on ARCH_QCOM
+       help
+         This enables support for the Qualcomm Technologies, Inc.'s
+         SM6150 chipset. If you do not wish to build a kernel that
+         runs on this chipset or if you are unsure, say 'N' here.
 
 config ARCH_THUNDER
 	bool "Cavium Inc. Thunder SoC Family"

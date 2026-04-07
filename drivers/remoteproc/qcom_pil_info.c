@@ -26,32 +26,78 @@ struct pil_reloc {
 
 static struct pil_reloc _reloc __read_mostly;
 static DEFINE_MUTEX(pil_reloc_lock);
+static void __iomem *pil_timeout_base;
 
-static int qcom_pil_info_init(void)
+static void __iomem *qcom_map_pil_imem_resource(const char *compatible,
+						struct resource *imem)
 {
 	struct device_node *np;
-	struct resource imem;
 	void __iomem *base;
 	int ret;
+
+	np = of_find_compatible_node(NULL, NULL, compatible);
+	if (!np) {
+		pr_err("failed to find %s\n", compatible);
+		return ERR_PTR(-ENOENT);
+	}
+
+	ret = of_address_to_resource(np, 0, imem);
+	of_node_put(np);
+	if (ret < 0)
+		return ERR_PTR(ret);
+
+	base = ioremap(imem->start, resource_size(imem));
+	if (!base) {
+		pr_err("failed to map %s region\n", compatible);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	return base;
+}
+
+/**
+ * qcom_pil_timeouts_disabled() - Check if pil timeouts are disabled in imem
+ *
+ * Return: true if the value 0x53444247 is set in the disable timeout pil
+ * imem region, false otherwise.
+ */
+bool qcom_pil_timeouts_disabled(void)
+{
+	const char *compatible = "qcom,msm-imem-pil-disable-timeout";
+	bool timeouts_disabled;
+	struct resource imem;
+	void __iomem *base;
+
+	if (!pil_timeout_base) {
+		base = qcom_map_pil_imem_resource(compatible, &imem);
+		if (IS_ERR(base))
+			return false;
+
+		pil_timeout_base = base;
+	}
+
+	if (__raw_readl(pil_timeout_base) == 0x53444247) {
+		pr_info("pil-imem set to disable pil timeouts\n");
+		timeouts_disabled = true;
+	} else
+		timeouts_disabled = false;
+
+	return timeouts_disabled;
+}
+EXPORT_SYMBOL_GPL(qcom_pil_timeouts_disabled);
+
+static int qcom_pil_info_init(const char *compatible)
+{
+	struct resource imem;
+	void __iomem *base;
 
 	/* Already initialized? */
 	if (_reloc.base)
 		return 0;
 
-	np = of_find_compatible_node(NULL, NULL, "qcom,pil-reloc-info");
-	if (!np)
-		return -ENOENT;
-
-	ret = of_address_to_resource(np, 0, &imem);
-	of_node_put(np);
-	if (ret < 0)
-		return ret;
-
-	base = ioremap(imem.start, resource_size(&imem));
-	if (!base) {
-		pr_err("failed to map PIL relocation info region\n");
-		return -ENOMEM;
-	}
+	base = qcom_map_pil_imem_resource(compatible, &imem);
+	if (IS_ERR(base))
+		return PTR_ERR(base);
 
 	memset_io(base, 0, resource_size(&imem));
 
@@ -73,11 +119,12 @@ int qcom_pil_info_store(const char *image, phys_addr_t base, size_t size)
 {
 	char buf[PIL_RELOC_NAME_LEN];
 	void __iomem *entry;
+	size_t entry_size;
 	int ret;
 	int i;
 
 	mutex_lock(&pil_reloc_lock);
-	ret = qcom_pil_info_init();
+	ret = qcom_pil_info_init("qcom,pil-reloc-info");
 	if (ret < 0) {
 		mutex_unlock(&pil_reloc_lock);
 		return ret;
@@ -104,7 +151,8 @@ int qcom_pil_info_store(const char *image, phys_addr_t base, size_t size)
 	return -ENOMEM;
 
 found_unused:
-	memcpy_toio(entry, image, strnlen(image, PIL_RELOC_NAME_LEN));
+	entry_size = min(strlen(image), PIL_RELOC_ENTRY_SIZE - 1);
+	memcpy_toio(entry, image, entry_size);
 found_existing:
 	/* Use two writel() as base is only aligned to 4 bytes on odd entries */
 	writel(base, entry + PIL_RELOC_NAME_LEN);
@@ -122,6 +170,8 @@ static void __exit pil_reloc_exit(void)
 	iounmap(_reloc.base);
 	_reloc.base = NULL;
 	mutex_unlock(&pil_reloc_lock);
+	iounmap(pil_timeout_base);
+	pil_timeout_base = NULL;
 }
 module_exit(pil_reloc_exit);
 

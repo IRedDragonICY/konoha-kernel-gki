@@ -41,6 +41,9 @@ struct iova_domain {
 	struct hlist_node	cpuhp_dead;
 
 	ANDROID_VENDOR_DATA(1);
+#if IS_ENABLED(CONFIG_QTVM_IOMMU_TRACE_HOOKS) && !defined(CONFIG_ANDROID_VENDOR_OEM_DATA)
+	u64 android_vendor_data1;
+#endif
 };
 
 static inline unsigned long iova_size(struct iova *iova)

@@ -2,6 +2,7 @@
 /*
  * Copyright(C) 2015 Linaro Limited. All rights reserved.
  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CORESIGHT_TMC_H
@@ -12,6 +13,9 @@
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
 #include <linux/refcount.h>
+#include "coresight-priv.h"
+#include "coresight-byte-cntr.h"
+#include "coresight-tmc-usb.h"
 
 #define TMC_RSZ			0x004
 #define TMC_STS			0x00c
@@ -131,6 +135,9 @@ enum tmc_mem_intf_width {
 #define CORESIGHT_SOC_600_ETR_CAPS	\
 	(TMC_ETR_SAVE_RESTORE | TMC_ETR_AXI_ARCACHE)
 
+/* SW USB reserved memory size */
+#define TMC_ETR_SW_USB_BUF_SIZE SZ_64M
+
 enum etr_mode {
 	ETR_MODE_FLAT,		/* Uses contiguous flat buffer */
 	ETR_MODE_ETR_SG,	/* Uses in-built TMC ETR SG mechanism */
@@ -138,6 +145,18 @@ enum etr_mode {
 };
 
 struct etr_buf_operations;
+
+enum tmc_etr_out_mode {
+	TMC_ETR_OUT_MODE_NONE,
+	TMC_ETR_OUT_MODE_MEM,
+	TMC_ETR_OUT_MODE_USB,
+};
+
+static const char * const str_tmc_etr_out_mode[] = {
+	[TMC_ETR_OUT_MODE_NONE]		= "none",
+	[TMC_ETR_OUT_MODE_MEM]		= "mem",
+	[TMC_ETR_OUT_MODE_USB]		= "usb",
+};
 
 /**
  * struct etr_buf - Details of the buffer used by ETR
@@ -187,6 +206,15 @@ struct etr_buf {
  * @idr_mutex:	Access serialisation for idr.
  * @sysfs_buf:	SYSFS buffer for ETR.
  * @perf_buf:	PERF buffer for ETR.
+ * @byte_cntr:	byte_cntr for ETR.
+ * @coresight_csr：CSR for ETR.
+ * @csr_name:	name for CSR.
+ * @atid_offset: atid register offset for CSR.
+ * @out_mode:	out mode for ETR.
+ * @usb_data:	usb data for ETR.
+ * @stop_on_flush: flag of stop_on_flush for ETR.
+ * @delayed:	parameter for delayed probe.
+ * @atclk:	optional clock for the core parts of the TMC.
  */
 struct tmc_drvdata {
 	void __iomem		*base;
@@ -195,6 +223,7 @@ struct tmc_drvdata {
 	spinlock_t		spinlock;
 	pid_t			pid;
 	bool			reading;
+	bool			busy;
 	union {
 		char		*buf;		/* TMC ETB */
 		struct etr_buf	*etr_buf;	/* TMC ETR */
@@ -205,12 +234,24 @@ struct tmc_drvdata {
 	u32			mode;
 	enum tmc_config_type	config_type;
 	enum tmc_mem_intf_width	memwidth;
+	struct mutex		mem_lock;
 	u32			trigger_cntr;
 	u32			etr_caps;
 	struct idr		idr;
 	struct mutex		idr_mutex;
 	struct etr_buf		*sysfs_buf;
 	struct etr_buf		*perf_buf;
+	struct byte_cntr	*byte_cntr;
+	struct coresight_csr	*csr;
+	const char		*csr_name;
+	u32			atid_offset;
+	enum tmc_etr_out_mode	out_mode;
+	struct tmc_usb_data	*usb_data;
+	bool			stop_on_flush;
+	struct delay_probe_arg	*delayed;
+	struct clk		*atclk;
+	struct pm_config	pm_config;
+	struct list_head	link;
 };
 
 struct etr_buf_operations {
@@ -257,7 +298,10 @@ struct tmc_sg_table {
 /* Generic functions */
 int tmc_wait_for_tmcready(struct tmc_drvdata *drvdata);
 void tmc_flush_and_stop(struct tmc_drvdata *drvdata);
+void tmc_disable_stop_on_flush(struct tmc_drvdata *drvdata);
 void tmc_enable_hw(struct tmc_drvdata *drvdata);
+extern int tmc_etr_usb_init(struct amba_device *adev,
+		struct tmc_drvdata *drvdata);
 void tmc_disable_hw(struct tmc_drvdata *drvdata);
 u32 tmc_get_memwidth_mask(struct tmc_drvdata *drvdata);
 
@@ -269,14 +313,20 @@ extern const struct coresight_ops tmc_etf_cs_ops;
 
 ssize_t tmc_etb_get_sysfs_trace(struct tmc_drvdata *drvdata,
 				loff_t pos, size_t len, char **bufpp);
+ssize_t tmc_etr_buf_get_data(struct etr_buf *etr_buf,
+				u64 offset, size_t len, char **bufpp);
 /* ETR functions */
 int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
 int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
 void tmc_etr_disable_hw(struct tmc_drvdata *drvdata);
+struct byte_cntr *byte_cntr_init(struct amba_device *adev,
+					struct tmc_drvdata *drvdata);
+void byte_cntr_remove(struct byte_cntr *byte_cntr);
 extern const struct coresight_ops tmc_etr_cs_ops;
 ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
 				loff_t pos, size_t len, char **bufpp);
-
+long tmc_get_rwp_offset(struct tmc_drvdata *drvdata);
+int tmc_etr_switch_mode(struct tmc_drvdata *drvdata, const char *out_mode);
 
 #define TMC_REG_PAIR(name, lo_off, hi_off)				\
 static inline u64							\

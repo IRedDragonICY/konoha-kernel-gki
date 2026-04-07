@@ -77,6 +77,7 @@ static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
 int etm_perf_add_symlink_cscfg(struct device *dev,
 			       struct cscfg_config_desc *config_desc);
 void etm_perf_del_symlink_cscfg(struct cscfg_config_desc *config_desc);
+struct list_head *etm_event_get_path(struct perf_event *event);
 #else
 static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
 { return -EINVAL; }
@@ -91,7 +92,8 @@ int etm_perf_add_symlink_cscfg(struct device *dev,
 			       struct cscfg_config_desc *config_desc)
 { return -EINVAL; }
 void etm_perf_del_symlink_cscfg(struct cscfg_config_desc *config_desc) {}
-
+struct list_head *etm_event_get_path(struct perf_event *event)
+{ return NULL; }
 #endif /* CONFIG_CORESIGHT */
 
 int __init etm_perf_init(void);

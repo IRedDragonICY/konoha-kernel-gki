@@ -68,8 +68,6 @@
 #include <linux/uaccess.h>
 #include <linux/mroute6.h>
 
-#include <trace/hooks/net.h>
-
 #include "ip6_offload.h"
 
 MODULE_AUTHOR("Cast of dozens");
@@ -123,7 +121,7 @@ static int inet6_create(struct net *net, struct socket *sock, int protocol,
 {
 	struct inet_sock *inet;
 	struct ipv6_pinfo *np;
-	struct sock *sk = NULL;
+	struct sock *sk;
 	struct inet_protosw *answer;
 	struct proto *answer_prot;
 	unsigned char answer_flags;
@@ -266,11 +264,7 @@ lookup_protocol:
 		if (err)
 			goto out_sk_release;
 	}
-
-	trace_android_rvh_inet_sock_create(sk);
-
 out:
-	trace_android_vh_inet_create(sk, err);
 	return err;
 out_rcu_unlock:
 	rcu_read_unlock();
@@ -511,7 +505,7 @@ void inet6_cleanup_sock(struct sock *sk)
 
 	/* Free tx options */
 
-	opt = xchg((__force struct ipv6_txoptions **)&np->opt, NULL);
+	opt = unrcu_pointer(xchg(&np->opt, NULL));
 	if (opt) {
 		atomic_sub(opt->tot_len, &sk->sk_omem_alloc);
 		txopt_put(opt);

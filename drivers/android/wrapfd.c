@@ -109,7 +109,7 @@ static int dmabuf_content_load(struct wrap_content *content, struct file *file,
 	dmabuf_content = container_of(content, struct wrap_content_dmabuf,
 				      content);
 
-	if (check_add_overflow(buf_offs, PAGE_ALIGN(len), &end))
+	if (check_add_overflow(buf_offs, len, &end))
 		return -EINVAL;
 
 	if (end > dmabuf_content->dmabuf->size)
@@ -134,13 +134,13 @@ static int dmabuf_content_load(struct wrap_content *content, struct file *file,
 	kiocb.ki_pos = file_offs;
 	kiocb.ki_flags |= IOCB_DIRECT;
 
-	while (len > 0) {
-		loff_t count = min_t(loff_t, MAX_RW_COUNT, PAGE_ALIGN(len));
+	while (len) {
+		loff_t count = min_t(loff_t, MAX_RW_COUNT, len);
 
 		iov.iov_len = count;
 		iov_iter_kvec(&iter, ITER_DEST, &iov, 1, iov.iov_len);
 		bytes_read = 0;
-		while (len > 0 && bytes_read < count) {
+		while (bytes_read < count) {
 			ssize_t sz = vfs_iocb_iter_read(file, &kiocb, &iter);
 
 			if (sz <= 0) {
@@ -148,9 +148,9 @@ static int dmabuf_content_load(struct wrap_content *content, struct file *file,
 				goto err_unmap;
 			}
 			bytes_read += sz;
-			len -= sz;
 		}
 		iov.iov_base += count;
+		len -= count;
 	}
 err_unmap:
 	dma_buf_vunmap(dmabuf_content->dmabuf, &map);
@@ -702,6 +702,9 @@ static int wrap_file_load(struct wrap_ctx *ctx,
 		ret = -EINVAL;
 		goto put_file;
 	}
+
+	/* Align the size to the page boundary */
+	wrapfd_load.len = PAGE_ALIGN(wrapfd_load.len);
 
 	if (check_add_overflow(wrapfd_load.file_offs, wrapfd_load.len,
 			       &end)) {

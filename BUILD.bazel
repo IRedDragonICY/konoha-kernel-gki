@@ -29,12 +29,15 @@ load(
     "merged_kernel_uapi_headers",
 )
 load(":abi.bzl", "cc_binary_with_abi")
+load(":consolidate.bzl", "define_consolidate")
+load(":consolidate_16k.bzl", "define_consolidate_16k")
 load(
     ":modules.bzl",
     "get_gki_modules_list",
     "get_gki_protected_modules_list",
     "get_kunit_modules_list",
 )
+load(":msm_platforms.bzl", "define_msm_platforms")
 
 package(
     default_visibility = [
@@ -691,6 +694,12 @@ copy_to_dist_dir(
     log = "info",
 )
 
+define_consolidate()
+
+define_consolidate_16k()
+
+define_msm_platforms()
+
 _ROCKPI4_MODULE_OUTS = [
     # keep sorted
     "drivers/char/hw_random/virtio-rng.ko",
@@ -1216,12 +1225,16 @@ filegroup(
 ddk_headers(
     name = "all_headers_unsafe",
     hdrs = [
+        "drivers/devfreq/governor.h",
         "drivers/gpu/drm/virtio/virtgpu_trace.h",
+        "mm/slab.h",
     ],
     # The list of include directories where source files can #include headers
     # from. In other words, these are the `-I` option to the C compiler.
     # Unsafe include directories are appended to ccflags-y.
-    includes = [],
+    includes = [
+        "drivers/devfreq",
+    ],
     visibility = ["//visibility:private"],
 )
 

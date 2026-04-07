@@ -93,11 +93,6 @@ int cache_line_size(void);
 
 #define dma_get_cache_alignment	cache_line_size
 
-static inline void arch_sync_dma_flush(void)
-{
-	dsb(sy);
-}
-
 /*
  * Read the effective value of CTR_EL0.
  *

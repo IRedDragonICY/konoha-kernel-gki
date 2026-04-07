@@ -93,8 +93,16 @@
 #define DMA_TBS_DEF_FTOS		(DMA_TBS_FTOS | DMA_TBS_FTOV)
 
 /* Following DMA defines are chanels oriented */
+#ifdef CONFIG_DWMAC_QCOM_VER3
+#define DMA_CHAN_BASE_ADDR		0x00008100
+#define DMA_CHAN_BASE_OFFSET		0x1000
+#else
 #define DMA_CHAN_BASE_ADDR		0x00001100
 #define DMA_CHAN_BASE_OFFSET		0x80
+#endif
+#define DMA_CHANX_BASE_ADDR(x)		(DMA_CHAN_BASE_ADDR + \
+					((x) * DMA_CHAN_BASE_OFFSET))
+#define DMA_CHAN_REG_NUMBER		17
 
 static inline u32 dma_chanx_base_addr(const struct dwmac4_addrs *addrs,
 				      const u32 x)
@@ -108,8 +116,6 @@ static inline u32 dma_chanx_base_addr(const struct dwmac4_addrs *addrs,
 
 	return addr;
 }
-
-#define DMA_CHAN_REG_NUMBER		17
 
 #define DMA_CHAN_CONTROL(addrs, x)	dma_chanx_base_addr(addrs, x)
 #define DMA_CHAN_TX_CONTROL(addrs, x)	(dma_chanx_base_addr(addrs, x) + 0x4)

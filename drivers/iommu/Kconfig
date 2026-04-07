@@ -45,6 +45,18 @@ config IOMMU_IO_PGTABLE_LPAE_SELFTEST
 
 	  If unsure, say N here.
 
+config IOMMU_IO_PGTABLE_FAST
+	bool "Fast ARMv7/v8 Long Descriptor Format"
+	depends on (ARM || ARM64) && IOMMU_DMA && ARM64_4K_PAGES
+	help
+          Enable support for a subset of the ARM long descriptor pagetable
+	  format.  This allocator achieves fast performance by
+	  pre-allocating and pre-populating page table memory up front.
+	  only supports a 32 bit virtual address space.
+
+          This implementation is mainly optimized for use cases where the
+          buffers are small (<= 64K) since it only supports 4K page sizes.
+
 config IOMMU_IO_PGTABLE_ARMV7S
 	bool "ARMv7/v8 Short Descriptor Format"
 	select IOMMU_IO_PGTABLE
@@ -331,6 +343,15 @@ config ARM_SMMU
 	  Say Y here if your SoC includes an IOMMU device implementing
 	  the ARM SMMU architecture.
 
+config ARM_SMMU_CONTEXT_FAULT_RETRY
+        bool "Context fault retry sequence"
+        depends on ARM_SMMU && (ARCH_WAIPIO || ARCH_PARROT)
+        help
+          In some cases, issuing a tlb invalidate operation after a
+          context fault may cause a subsequent retry of the failing
+          address to succeed. Only applies to clients which have
+          stall-on-fault enabled, like display.
+
 config ARM_SMMU_LEGACY_DT_BINDINGS
 	bool "Support the legacy \"mmu-masters\" devicetree bindings"
 	depends on ARM_SMMU=y && OF
@@ -385,6 +406,82 @@ config ARM_SMMU_QCOM_DEBUG
 
 	  Say Y here to enable debug for issues such as TLB sync timeouts
 	  which requires implementation defined register dumps.
+
+config QTI_IOMMU_SUPPORT
+	tristate "Support for QTI iommu drivers"
+	help
+	  The QTI GPU device may switch between multiple iommu domains,
+	  depending on usecase. This introduces a need to track all such
+	  domains in a non-driver specific manner.
+	  If in doubt say N.
+
+config QCOM_IOMMU_UTIL
+	tristate "Support for qcom additions to the iommu framework"
+	help
+	  QCOM iommu drivers support a general set of functionality in
+	  addition to the functions provided by the iommu framework.
+	  This includes devicetree properties for configuring iommu
+	  groups and iova ranges.
+
+	  Say N here if unsure.
+
+config QCOM_IOMMU_DEBUG
+	tristate "IOMMU debugging and testing"
+	depends on QCOM_IOMMU_UTIL
+	depends on DEBUG_FS
+	help
+	  This option is used to enable profiling and debugging in
+	  the IOMMU framework code. IOMMU profiling and debugging
+	  can be done through the debugfs nodes which this option
+	  makes available.
+
+config ARM_SMMU_SELFTEST
+	bool "ARM SMMU self test support"
+	depends on ARM_SMMU
+	help
+	  Enables self tests for arm smmu. Tests basic hardware
+	  configurations like interrupts. Note that enabling this
+	  option can marginally increase the boot time.
+
+	  If unsure, say N.
+
+config ARM_SMMU_TESTBUS
+	bool "Enable ARM SMMU testbus feature "
+	depends on ARM_SMMU
+	help
+	  Enable testbus feature to help in capturing TCU/TBU state and
+	  help debug TLB Sync timeout failure.Enables option for testbus
+	  debugfs to select and read testbus output.
+	  Note to use this only on debug builds.
+
+	  If unsure, say N here.
+
+config ARM_SMMU_TESTBUS_DEBUGFS
+	bool "Expose testbus control debugfs nodes"
+	depends on ARM_SMMU && IOMMU_DEBUGFS && ARM_SMMU_TESTBUS
+	help
+	  Support for exposing debugfs nodes to set testbus select values
+	  for selecting a testbus to inspect for a particular TCU/TBU
+	  on an SMMU. This also exposes debugfs nodes to read testbus output
+	  after the output has been selected.
+
+config ARM_SMMU_TESTBUS_DUMP
+	bool "ARM SMMU testbus dump"
+	depends on ARM_SMMU && ARM_SMMU_TESTBUS
+	help
+	  Enables testbus dump collection on arm smmu right after TLB
+	  sync timeout failure.
+	  Note to use this only on debug builds.
+
+config ARM_SMMU_CAPTUREBUS_DEBUGFS
+	bool "Expose capturebus control debugfs nodes"
+	depends on ARM_SMMU && QCOM_IOMMU_DEBUG
+	help
+	  Support for exposing debugfs nodes to configure capturebus for each
+	  tbu of an SMMU. This also exposes debugfs nodes to get the snapshot
+	  of capturebus.
+
+	  If unsure, say N here.
 
 config ARM_SMMU_V3
 	tristate "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
@@ -501,5 +598,40 @@ config SPRD_IOMMU
 	  ISP(image), and CPP(camera pixel processor), etc.
 
 	  Say Y here if you want to use the multimedia devices listed above.
+
+config QCOM_LAZY_MAPPING
+	tristate "Reference counted iommu-mapping support"
+	depends on QCOM_DMABUF_HEAPS
+	depends on IOMMU_API
+	help
+	  DMA-BUFs may be shared between several software clients.
+	  Reference counting the mapping may simplify coordination between
+	  these clients, and decrease latency by preventing multiple
+	  map/unmaps of the same region.
+
+	  If unsure, say N here.
+
+config QTVM_IOMMU_TRACE_HOOKS
+	bool "Trace hooks used for QTVM"
+	depends on QCOM_IOMMU_UTIL
+	depends on !ANDROID_VENDOR_HOOKS
+	help
+	  When Android vendor hooks isn't available in a non Android
+	  environment, enable this config to call certain vendor hooks
+	  in the absence of Android vendor hooks. This helps to enable
+	  certain feature in the non Android environment.
+
+	  If unsure, say N here.
+
+config IOMMU_TLBSYNC_DEBUG
+	bool "TLB sync timeout debug"
+	depends on ARM_SMMU
+	help
+	  Collects the SMMU system state information after the
+	  first TLB sync timeout failure by calling BUG() from
+	  a workqueue thread. Note to use this only on debug
+	  builds.
+
+	  Say N here if unsure.
 
 endif # IOMMU_SUPPORT

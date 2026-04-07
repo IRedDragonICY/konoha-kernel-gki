@@ -1,6 +1,7 @@
-# SPDX-License-Identifier: GPL-2.0-only
-ccflags-y += -O3
+ccflags-y += -O3 \
+    -DLZ4_FREESTANDING=0 \
+    -DLZ4_FAST_DEC_LOOP=1
 
-obj-$(CONFIG_LZ4_COMPRESS) += lz4_compress.o
-obj-$(CONFIG_LZ4HC_COMPRESS) += lz4hc_compress.o
-obj-$(CONFIG_LZ4_DECOMPRESS) += lz4_decompress.o
+obj-y += lz4.o lz4hc.o
+CFLAGS_lz4.o  += -DLZ4_HEAPMODE=1
+CFLAGS_lz4hc.o += -DLZ4HC_HEAPMODE=1

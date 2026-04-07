@@ -37,6 +37,20 @@
 #define CTICHOUTSTATUS		0x13C
 #define CTIGATE			0x140
 #define ASICCTL			0x144
+
+#define CTIINTACK_EXTENDED(n)   (0x020 + (4 * n))
+#define CTIAPPSET_EXTENDED      0x004
+#define CTIAPPCLEAR_EXTENDED    0x008
+#define CTIAPPPULSE_EXTENDED    0x00C
+#define CTIINEN_EXTENDED(n)     (0x400 + (4 * n))
+#define CTIOUTEN_EXTENDED(n)    (0x800 + (4 * n))
+#define CTITRIGINSTATUS_EXTENDED(n)     (0x040 + (4 * n))
+#define CTITRIGOUTSTATUS_EXTENDED(n)    (0x060 + (4 * n))
+#define CTICHINSTATUS_EXTENDED  0x080
+#define CTICHOUTSTATUS_EXTENDED 0x084
+#define CTIGATE_EXTENDED        0x088
+#define ASICCTL_EXTENDED        0x08c
+
 /* Integration test registers */
 #define ITCHINACK		0xEDC /* WO CTI CSSoc 400 only*/
 #define ITTRIGINACK		0xEE0 /* WO CTI CSSoc 400 only*/
@@ -46,6 +60,16 @@
 #define ITTRIGOUTACK		0xEF0 /* RO CTI CSSoc 400 only*/
 #define ITCHIN			0xEF4 /* RO */
 #define ITTRIGIN		0xEF8 /* RO */
+
+#define ITCHINACK_EXTENDED		0xE70 /* WO CTI CSSoc 400 only*/
+#define ITTRIGINACK_EXTENDED(n)		(0xE80 + (4 * n)) /* WO CTI CSSoc 400 only*/
+#define ITCHOUT_EXTENDED		0xE74 /* WO RW-600 */
+#define ITTRIGOUT_EXTENDED(n)		(0xEA + (4 * n)) /* WO RW-600 */
+#define ITCHOUTACK_EXTENDED		0xE78 /* RO CTI CSSoc 400 only*/
+#define ITTRIGOUTACK_EXTENDED(n)	(0xEC0 + (4 * n)) /* RO CTI CSSoc 400 only*/
+#define ITCHIN_EXTENDED			0xE7C /* RO */
+#define ITTRIGIN_EXTENDED(n)		(0xEE0 + (4 * n)) /* RO */
+
 /* management registers */
 #define CTIDEVAFF0		0xFA8
 #define CTIDEVAFF1		0xFAC
@@ -56,7 +80,7 @@
  * Max of in and out defined in the DEVID register.
  * - pick up actual number used from .dts parameters if present.
  */
-#define CTIINOUTEN_MAX		32
+#define CTIINOUTEN_MAX		128
 
 /**
  * Group of related trigger signals
@@ -67,7 +91,7 @@
  */
 struct cti_trig_grp {
 	int nr_sigs;
-	u32 used_mask;
+	DECLARE_BITMAP(used_mask, CTIINOUTEN_MAX);
 	int sig_types[];
 };
 
@@ -144,11 +168,14 @@ struct cti_config {
 	int enable_req_count;
 	bool hw_enabled;
 	bool hw_powered;
+#if defined(CONFIG_DEEPSLEEP) || defined(CONFIG_HIBERNATION)
+	bool hw_enabled_store;
+#endif
 
 	/* registered triggers and filtering */
-	u32 trig_in_use;
-	u32 trig_out_use;
-	u32 trig_out_filter;
+	DECLARE_BITMAP(trig_in_use, CTIINOUTEN_MAX);
+	DECLARE_BITMAP(trig_out_use, CTIINOUTEN_MAX);
+	DECLARE_BITMAP(trig_out_filter, CTIINOUTEN_MAX);
 	bool trig_filter_enable;
 	u8 xtrig_rchan_sel;
 
@@ -161,6 +188,11 @@ struct cti_config {
 	u32 asicctl;
 };
 
+struct cti_pctrl {
+	struct pinctrl			*pctrl;
+	int				trig;
+};
+
 /**
  * struct cti_drvdata - specifics for the CTI device
  * @base:	Memory mapped base address for this component..
@@ -170,6 +202,7 @@ struct cti_config {
  * @config:	Configuration data for this CTI device.
  * @node:	List entry of this device in the list of CTI devices.
  * @csdev_release: release function for underlying coresight_device.
+ * @atclk:	optional clock for the core parts of the CTI.
  */
 struct cti_drvdata {
 	void __iomem *base;
@@ -179,6 +212,10 @@ struct cti_drvdata {
 	struct cti_config config;
 	struct list_head node;
 	void (*csdev_release)(struct device *dev);
+	bool	extended_cti;
+	struct cti_pctrl		*gpio_trigin;
+	struct cti_pctrl		*gpio_trigout;
+	struct clk			*atclk;
 };
 
 /*
@@ -217,6 +254,8 @@ struct cti_trig_con *cti_allocate_trig_con(struct device *dev, int in_sigs,
 					   int out_sigs);
 int cti_enable(struct coresight_device *csdev, enum cs_mode mode, void *data);
 int cti_disable(struct coresight_device *csdev, void *data);
+void cti_trigin_gpio_disable(struct cti_drvdata *drvdata);
+void cti_trigout_gpio_disable(struct cti_drvdata *drvdata);
 void cti_write_all_hw_regs(struct cti_drvdata *drvdata);
 void cti_write_intack(struct device *dev, u32 ackval);
 void cti_write_single_reg(struct cti_drvdata *drvdata, int offset, u32 value);

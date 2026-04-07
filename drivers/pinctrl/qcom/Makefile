@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0
 # Qualcomm pin control drivers
 obj-$(CONFIG_PINCTRL_MSM)	+= pinctrl-msm.o
+obj-$(CONFIG_PINCTRL_TUNA)	+= pinctrl-tuna.o
+obj-$(CONFIG_PINCTRL_KERA)	+= pinctrl-kera.o
+obj-$(CONFIG_PINCTRL_SUN)	+= pinctrl-sun.o
+obj-$(CONFIG_PINCTRL_RAVELIN) += pinctrl-ravelin.o
+obj-$(CONFIG_PINCTRL_PINEAPPLE) += pinctrl-pineapple.o
+obj-$(CONFIG_PINCTRL_PARROT) += pinctrl-parrot.o
 obj-$(CONFIG_PINCTRL_APQ8064)	+= pinctrl-apq8064.o
 obj-$(CONFIG_PINCTRL_APQ8084)	+= pinctrl-apq8084.o
 obj-$(CONFIG_PINCTRL_IPQ4019)	+= pinctrl-ipq4019.o
@@ -48,6 +54,7 @@ obj-$(CONFIG_PINCTRL_SM6115_LPASS_LPI) += pinctrl-sm6115-lpass-lpi.o
 obj-$(CONFIG_PINCTRL_SM6125) += pinctrl-sm6125.o
 obj-$(CONFIG_PINCTRL_SM6350) += pinctrl-sm6350.o
 obj-$(CONFIG_PINCTRL_SM6375) += pinctrl-sm6375.o
+obj-$(CONFIG_PINCTRL_SM6150) += pinctrl-sm6150.o
 obj-$(CONFIG_PINCTRL_SM7150) += pinctrl-sm7150.o
 obj-$(CONFIG_PINCTRL_SM8150) += pinctrl-sm8150.o
 obj-$(CONFIG_PINCTRL_SM8250) += pinctrl-sm8250.o
@@ -59,3 +66,5 @@ obj-$(CONFIG_PINCTRL_SM8550) += pinctrl-sm8550.o
 obj-$(CONFIG_PINCTRL_SM8550_LPASS_LPI) += pinctrl-sm8550-lpass-lpi.o
 obj-$(CONFIG_PINCTRL_SC8280XP_LPASS_LPI) += pinctrl-sc8280xp-lpass-lpi.o
 obj-$(CONFIG_PINCTRL_LPASS_LPI) += pinctrl-lpass-lpi.o
+obj-$(CONFIG_PINCTRL_X1E80100) += pinctrl-x1e80100.o
+obj-$(CONFIG_PINCTRL_MONACO) += pinctrl-monaco.o

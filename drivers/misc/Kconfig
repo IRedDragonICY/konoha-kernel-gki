@@ -547,6 +547,14 @@ config TMR_INJECT
 
 	  Say N here unless you know what you are doing.
 
+config QSEECOM_PROXY
+	tristate "To enable qseecom proxy driver for kernel client"
+	help
+	 qseecom proxy driver serves the kernel clients by providing
+	 required ops via call back functions with a minimal framework.
+	 These callback functions can be used to start, shutdown and
+	 send commands to the trusted apps.
+
 config TPS6594_ESM
 	tristate "TI TPS6594 Error Signal Monitor support"
 	depends on MFD_TPS6594
@@ -578,6 +586,17 @@ config PKVM_SMC_FILTER
 	  driver, this is intended to be a template and not shipped as is.
 
 	  Say N here unless you know what you are doing.
+
+config NTSYNC
+	tristate "NT synchronization primitive emulation"
+	help
+	  This module provides kernel support for emulation of Windows NT
+	  synchronization primitives. It is not a hardware driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ntsync.
+
+	  If unsure, say N.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

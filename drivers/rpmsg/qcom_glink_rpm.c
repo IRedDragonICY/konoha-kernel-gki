@@ -358,7 +358,9 @@ static int glink_rpm_probe(struct platform_device *pdev)
 
 	enable_irq(rpm->irq);
 
-	return 0;
+	ret = qcom_glink_native_start(glink);
+
+	return ret;
 }
 
 static void glink_rpm_remove(struct platform_device *pdev)
@@ -385,6 +387,7 @@ static struct platform_driver glink_rpm_driver = {
 	.driver = {
 		.name = "qcom_glink_rpm",
 		.of_match_table = glink_rpm_of_match,
+		.pm = &glink_native_pm_ops,
 	},
 };
 

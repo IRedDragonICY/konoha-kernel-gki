@@ -33,5 +33,10 @@
 #define IPCC_CLIENT_NSP1		18
 #define IPCC_CLIENT_TME			23
 #define IPCC_CLIENT_WPSS		24
+#define IPCC_CLIENT_SOCCP		46
+#define IPCC_CLIENT_CAM1		47
+
+
+#define IPCC_CLIENT_BROADCAST           0xF000
 
 #endif

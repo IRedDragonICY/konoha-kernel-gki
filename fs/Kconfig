@@ -402,6 +402,56 @@ source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 source "fs/unicode/Kconfig"
 
+menu "KernelSU SUSFS"
+	depends on KSU
+
+config KSU_SUSFS
+	bool "KernelSU SUSFS support"
+	depends on KSU
+	help
+	  Enable SUSFS core support used by KernelSU.
+
+if KSU_SUSFS
+
+config KSU_SUSFS_SUS_PATH
+	bool "Enable SUS path feature"
+	help
+	  Enable path hiding/spoofing hooks used by SUSFS.
+
+config KSU_SUSFS_SUS_MOUNT
+	bool "Enable SUS mount feature"
+	help
+	  Enable mount filtering/spoofing hooks used by SUSFS.
+
+config KSU_SUSFS_SUS_KSTAT
+	bool "Enable SUS kstat feature"
+	help
+	  Enable stat/kstat spoofing hooks used by SUSFS.
+
+config KSU_SUSFS_SPOOF_UNAME
+	bool "Enable uname spoofing"
+	help
+	  Allow SUSFS to spoof uname release/version data.
+
+config KSU_SUSFS_ENABLE_LOG
+	bool "Enable SUSFS runtime log control"
+	help
+	  Allow userspace control of SUSFS debug/info logging.
+
+config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+	bool "Enable cmdline/bootconfig spoofing"
+	help
+	  Allow SUSFS to spoof /proc/cmdline or bootconfig data.
+
+config KSU_SUSFS_OPEN_REDIRECT
+	bool "Enable open redirect feature"
+	help
+	  Enable open-path redirection support in SUSFS.
+
+endif
+
+endmenu
+
 config IO_WQ
 	bool
 

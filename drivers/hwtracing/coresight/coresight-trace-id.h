@@ -153,4 +153,7 @@ void coresight_trace_id_perf_start(void);
  */
 void coresight_trace_id_perf_stop(void);
 
+int coresight_trace_id_reserve_id(int id);
+void coresight_trace_id_free_reserved_id(int id);
+
 #endif /* _CORESIGHT_TRACE_ID_H */

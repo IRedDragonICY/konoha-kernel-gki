@@ -54,7 +54,7 @@ try_tag() {
 scm_version()
 {
 	local short=false
-	local no_dirty=false
+	local no_dirty=true
 	local tag
 
 	while [ $# -gt 0 ];
@@ -113,7 +113,7 @@ scm_version()
 		# If only the short version is requested, don't bother
 		# running further git commands
 		if $short; then
-			echo "+"
+			# echo "+"
 			return
 		fi
 

@@ -57,7 +57,6 @@
 #include <linux/seq_file.h>
 #include <trace/events/skb.h>
 #include "udp_impl.h"
-#include <trace/hooks/net.h>
 
 static void udpv6_destruct_sock(struct sock *sk)
 {
@@ -446,8 +445,6 @@ try_again:
 	err = copied;
 	if (flags & MSG_TRUNC)
 		err = ulen;
-
-	trace_android_rvh_udpv6_recvmsg(sk, msg, len, flags, addr_len);
 
 	skb_consume_udp(sk, skb, peeking ? -err : err);
 	return err;
@@ -931,7 +928,6 @@ static int udp6_unicast_rcv_skb(struct sock *sk, struct sk_buff *skb,
 	if (inet_get_convert_csum(sk) && uh->check && !IS_UDPLITE(sk))
 		skb_checksum_try_convert(skb, IPPROTO_UDP, ip6_compute_pseudo);
 
-	trace_android_vh_udp6_unicast_rcv_skb(skb, sk);
 	ret = udpv6_queue_rcv_skb(sk, skb);
 
 	/* a return value > 0 means to resubmit the input */
@@ -1354,8 +1350,6 @@ int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	int is_udplite = IS_UDPLITE(sk);
 	int (*getfrag)(void *, char *, int, int, int, struct sk_buff *);
 
-	trace_android_rvh_udpv6_sendmsg(sk, msg, len);
-
 	ipcm6_init(&ipc6);
 	ipc6.gso_size = READ_ONCE(up->gso_size);
 	ipc6.sockc.tsflags = READ_ONCE(sk->sk_tsflags);
@@ -1476,8 +1470,6 @@ do_udp_sendmsg:
 		fl6->flowlabel = np->flow_label;
 		connected = true;
 	}
-
-	trace_android_vh_udp_v6_connect(sk, sin6);
 
 	if (!fl6->flowi6_oif)
 		fl6->flowi6_oif = READ_ONCE(sk->sk_bound_dev_if);

@@ -35,6 +35,7 @@ config CORESIGHT_LINK_AND_SINK_TMC
 	tristate "Coresight generic TMC driver"
 
 	depends on CORESIGHT_LINKS_AND_SINKS
+	select CORESIGHT_CSR
 	help
 	  This enables support for the Trace Memory Controller driver.
 	  Depending on its configuration the device can act as a link (embedded
@@ -188,6 +189,54 @@ config CORESIGHT_CTI_INTEGRATION_REGS
 	  registers are not used in normal operation and can leave devices in
 	  an inconsistent state.
 
+config CORESIGHT_TRACE_NOC
+	tristate "Coresight Trace Noc driver"
+	help
+	  This driver provides support for Trace NoC component.
+	  Trace NoC is a interconnect that is used to collect trace from
+	  various subsystems and transport it QDSS trace sink.It sits in
+	  the different tiles of SOC and aggregates the trace local to the
+	  tile and transports it another tile or to QDSS trace sink eventually.
+
+config CORESIGHT_TGU
+	tristate "CoreSight Trigger Generation Unit driver"
+	help
+	  This driver provides support for Trigger Generation Unit that is
+	  used to detect patterns or sequences on a given set of signals.
+	  TGU is used to monitor a particular bus within a given region to
+	  detect illegal transaction sequences or slave responses. It is also
+	  used to monitor a data stream to detect protocol violations and to
+	  provide a trigger point for centering data around a specific event
+	  within the trace data buffer.
+
+config CORESIGHT_CSR
+	tristate "CoreSight Slave Register driver"
+	help
+	  This driver provides support for CoreSight Slave Register block
+	  that hosts miscellaneous configuration registers.
+	  Those configuration registers can be used to control, various
+	  coresight configurations.
+
+config CORESIGHT_REMOTE_ETM
+	tristate "Remote processor ETM trace support"
+	depends on QCOM_QMI_HELPERS
+	help
+	  Enables support for ETM trace collection on remote processor using
+	  CoreSight framework. Enabling this will allow turning on ETM
+	  tracing on remote processor via sysfs by configuring the required
+	  CoreSight components.
+
+config CORESIGHT_UETM
+	tristate "CoreSight UETM driver"
+	depends on QTI_SCMI_VENDOR_PROTOCOL
+	help
+	  This driver provides support for Coresight UETM. This driver gathers
+	  UETM configuration parameters from sysfs userspace and sends them to
+	  CPUCP via SCMI.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called coresight-uetm.
+
 config CORESIGHT_TRBE
 	tristate "Trace Buffer Extension (TRBE) driver"
 	depends on ARM64 && CORESIGHT_SOURCE_ETM4X
@@ -244,6 +293,16 @@ config CORESIGHT_DUMMY
 	  CoreSight sources/sinks that are owned and configured by some
 	  other subsystem and use Linux drivers to configure rest of trace
 	  path.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called coresight-dummy.
+
+config CORESIGHT_QMI
+	tristate "CORESIGHT QMI support"
+	help
+	  Enables support for sending command to subsystem via QMI. this is
+	  primarily used for enabling remote ETM, assigning etr, assigning ATID
+	  for subsystem source.
 
 	  To compile this driver as a module, choose M here: the module will be
 	  called coresight-dummy.

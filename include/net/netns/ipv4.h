@@ -85,6 +85,10 @@ struct netns_ipv4 {
 	u8 sysctl_icmp_errors_use_inbound_ifaddr;
 	int sysctl_icmp_ratelimit;
 	int sysctl_icmp_ratemask;
+	int sysctl_icmp_msgs_per_sec;
+	int sysctl_icmp_msgs_burst;
+	atomic_t icmp_global_credit;
+	u32 icmp_global_stamp;
 
 	u32 ip_rt_min_pmtu;
 	int ip_rt_mtu_expires;
@@ -240,6 +244,9 @@ struct netns_ipv4 {
 
 	atomic_t	rt_genid;
 	siphash_key_t	ip_id_key;
+
+	unsigned int sysctl_tcp_backlog_ack_defer;
+	unsigned int sysctl_tcp_pingpong_thresh;
 
 	ANDROID_KABI_RESERVE(1);
 };

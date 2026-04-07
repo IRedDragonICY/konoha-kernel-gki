@@ -678,7 +678,10 @@ static inline void kvm_reset_vcpu_psci(struct kvm_vcpu *vcpu,
 		kvm_vcpu_set_be(vcpu);
 
 	*vcpu_pc(vcpu) = target_pc;
-	vcpu_set_reg(vcpu, 0, reset_state->r0);
+	vcpu_clear_flag(vcpu, PENDING_EXCEPTION);
+        vcpu_clear_flag(vcpu, EXCEPT_MASK);
+        vcpu_clear_flag(vcpu, INCREMENT_PC);
+        vcpu_set_reg(vcpu, 0, reset_state->r0);
 }
 
 #endif /* __ARM64_KVM_EMULATE_H__ */

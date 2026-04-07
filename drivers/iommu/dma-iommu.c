@@ -981,10 +981,8 @@ static void iommu_dma_sync_single_for_cpu(struct device *dev,
 		return;
 
 	phys = iommu_iova_to_phys(iommu_get_dma_domain(dev), dma_handle);
-	if (!dev_is_dma_coherent(dev)) {
+	if (!dev_is_dma_coherent(dev))
 		arch_sync_dma_for_cpu(phys, size, dir);
-		arch_sync_dma_flush();
-	}
 
 	if (is_swiotlb_buffer(dev, phys))
 		swiotlb_sync_single_for_cpu(dev, phys, size, dir);
@@ -1002,10 +1000,8 @@ static void iommu_dma_sync_single_for_device(struct device *dev,
 	if (is_swiotlb_buffer(dev, phys))
 		swiotlb_sync_single_for_device(dev, phys, size, dir);
 
-	if (!dev_is_dma_coherent(dev)) {
+	if (!dev_is_dma_coherent(dev))
 		arch_sync_dma_for_device(phys, size, dir);
-		arch_sync_dma_flush();
-	}
 }
 
 static void iommu_dma_sync_sg_for_cpu(struct device *dev,
@@ -1015,15 +1011,13 @@ static void iommu_dma_sync_sg_for_cpu(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 
-	if (sg_dma_is_swiotlb(sgl)) {
+	if (sg_dma_is_swiotlb(sgl))
 		for_each_sg(sgl, sg, nelems, i)
 			iommu_dma_sync_single_for_cpu(dev, sg_dma_address(sg),
 						      sg->length, dir);
-	} else if (!dev_is_dma_coherent(dev)) {
+	else if (!dev_is_dma_coherent(dev))
 		for_each_sg(sgl, sg, nelems, i)
 			arch_sync_dma_for_cpu(sg_phys(sg), sg->length, dir);
-		arch_sync_dma_flush();
-	}
 }
 
 static void iommu_dma_sync_sg_for_device(struct device *dev,
@@ -1033,16 +1027,14 @@ static void iommu_dma_sync_sg_for_device(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 
-	if (sg_dma_is_swiotlb(sgl)) {
+	if (sg_dma_is_swiotlb(sgl))
 		for_each_sg(sgl, sg, nelems, i)
 			iommu_dma_sync_single_for_device(dev,
 							 sg_dma_address(sg),
 							 sg->length, dir);
-	} else if (!dev_is_dma_coherent(dev)) {
+	else if (!dev_is_dma_coherent(dev))
 		for_each_sg(sgl, sg, nelems, i)
 			arch_sync_dma_for_device(sg_phys(sg), sg->length, dir);
-		arch_sync_dma_flush();
-	}
 }
 
 static dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
@@ -1093,10 +1085,8 @@ static dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
 		memset(padding_start, 0, padding_size);
 	}
 
-	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC)) {
+	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 		arch_sync_dma_for_device(phys, size, dir);
-		arch_sync_dma_flush();
-	}
 
 	iova = __iommu_dma_map(dev, phys, size, prot, dma_mask);
 	if (iova == DMA_MAPPING_ERROR && is_swiotlb_buffer(dev, phys))
@@ -1114,10 +1104,8 @@ static void iommu_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
 	if (WARN_ON(!phys))
 		return;
 
-	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC) && !dev_is_dma_coherent(dev)) {
+	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC) && !dev_is_dma_coherent(dev))
 		arch_sync_dma_for_cpu(phys, size, dir);
-		arch_sync_dma_flush();
-	}
 
 	__iommu_dma_unmap(dev, dma_handle, size);
 
