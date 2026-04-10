@@ -177,3 +177,5 @@ sphinx_*/
 /rust-project.json
 
 *.zip
+drivers/kernelsu
+.root_modules/
