@@ -319,6 +319,34 @@ if [ "$ENABLE_AUTOFDO" = "true" ]; then
     echo "[+] Found AutoFDO profile at $AFDO_PROFILE!"
 fi
 
+# Reduce debug overhead for production kernel
+# NOTE: Each config was verified against android/abi_gki_aarch64_qcom.
+# CONFIG_SCHED_DEBUG and CONFIG_SLUB_DEBUG are NOT disabled — they export
+# ABI symbols (sched_feat_keys, get_each_object_track, get_slabinfo).
+# CONFIG_KASAN cannot be compiled out — vendor modules depend on
+# kasan_flag_enabled. We disable it at runtime via kasan=off cmdline.
+echo "=========================================="
+echo "[+] Applying debug reduction configs..."
+echo "=========================================="
+scripts/config --file "$OUT_DIR/.config" \
+    -e CONFIG_DEBUG_INFO_REDUCED \
+    -d CONFIG_DEBUG_MISC
+    # -d CONFIG_UBSAN -d CONFIG_UBSAN_BOUNDS -d CONFIG_UBSAN_ARRAY_BOUNDS -d CONFIG_UBSAN_LOCAL_BOUNDS -d CONFIG_UBSAN_SANITIZE_ALL -d CONFIG_UBSAN_TRAP
+    # -d CONFIG_SCHEDSTATS
+    # -d CONFIG_DEBUG_MEMORY_INIT
+    # -d CONFIG_CMA_DEBUGFS
+    # -d CONFIG_BT_DEBUGFS
+    # -d CONFIG_RCU_TRACE
+    # -d CONFIG_PROFILING
+    # -d CONFIG_PRINTK_CALLER
+# Append kasan=off to CMDLINE if not already present
+CURRENT_CMDLINE=$(grep '^CONFIG_CMDLINE=' "$OUT_DIR/.config" | sed 's/^CONFIG_CMDLINE="//' | sed 's/"$//')
+if ! echo "$CURRENT_CMDLINE" | grep -q "kasan=off"; then
+    scripts/config --file "$OUT_DIR/.config" \
+        --set-str CONFIG_CMDLINE "$CURRENT_CMDLINE kasan=off"
+fi
+make O="$OUT_DIR" CC=clang LLVM=1 LLVM_IAS=1 olddefconfig || exit 1
+
 # Build kernel
 CPUS=$(nproc --all)
 echo "[+] Starting build with $CPUS threads..."
