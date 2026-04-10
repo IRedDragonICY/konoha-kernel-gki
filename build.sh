@@ -227,11 +227,11 @@ echo "=========================================="
 echo "[+] Applying Root Configuration..."
 echo "=========================================="
 if [ "$BUILD_VARIANT" == "1" ]; then
-    sscripts/config --file "$OUT_DIR/.config" -d CONFIG_KSU -d CONFIG_KSU_SUSFS
+    scripts/config --file "$OUT_DIR/.config" -d CONFIG_KSU -d CONFIG_KSU_SUSFS
 elif [ "$BUILD_VARIANT" == "2" ]; then
-    sscripts/config --file "$OUT_DIR/.config" -e CONFIG_KSU -d CONFIG_KSU_SUSFS
+    scripts/config --file "$OUT_DIR/.config" -e CONFIG_KSU -d CONFIG_KSU_SUSFS
 elif [ "$BUILD_VARIANT" == "3" ]; then
-    sscripts/config --file "$OUT_DIR/.config" \
+    scripts/config --file "$OUT_DIR/.config" \
         -e CONFIG_KSU \
         -e CONFIG_KSU_SUSFS \
         -e CONFIG_KSU_SUSFS_SUS_MAP
@@ -247,10 +247,10 @@ if [ "$OPTIMIZATION_PROFILE" == "1" ]; then
     scripts/config --file "$OUT_DIR/.config"         -d CONFIG_HZ_300         -d CONFIG_HZ_1000         -d CONFIG_HZ_100         -e CONFIG_HZ_250         --set-val CONFIG_HZ 250
 elif [ "$OPTIMIZATION_PROFILE" == "2" ]; then
     # Performance Mode (1000 HZ)
-    sscripts/config --file "$OUT_DIR/.config"         -d CONFIG_HZ_300         -d CONFIG_HZ_250         -d CONFIG_HZ_100         -e CONFIG_HZ_1000         --set-val CONFIG_HZ 1000         -d CONFIG_RCU_LAZY
+    scripts/config --file "$OUT_DIR/.config"         -d CONFIG_HZ_300         -d CONFIG_HZ_250         -d CONFIG_HZ_100         -e CONFIG_HZ_1000         --set-val CONFIG_HZ 1000         -d CONFIG_RCU_LAZY
 elif [ "$OPTIMIZATION_PROFILE" == "3" ]; then
     # Battery Mode (100 HZ)
-    sscripts/config --file "$OUT_DIR/.config"         -d CONFIG_HZ_300         -d CONFIG_HZ_250         -d CONFIG_HZ_1000         -e CONFIG_HZ_100         --set-val CONFIG_HZ 100         -e CONFIG_RCU_LAZY
+    scripts/config --file "$OUT_DIR/.config"         -d CONFIG_HZ_300         -d CONFIG_HZ_250         -d CONFIG_HZ_1000         -e CONFIG_HZ_100         --set-val CONFIG_HZ 100         -e CONFIG_RCU_LAZY
 fi
 
 make O="$OUT_DIR" CC=clang LLVM=1 LLVM_IAS=1 olddefconfig || exit 1
@@ -260,7 +260,7 @@ if [ "$DISABLE_CPU_MITIGATIONS" = "true" ]; then
     echo "=========================================="
     echo "[+] Disabling CPU & Spectre Mitigations..."
     echo "=========================================="
-    sscripts/config --file "$OUT_DIR/.config" \
+    scripts/config --file "$OUT_DIR/.config" \
         -d CONFIG_CPU_MITIGATIONS \
         -d CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY
 
@@ -273,7 +273,7 @@ if [ "$LTO_TYPE" = "full" ]; then
     echo "=========================================="
     echo "[+] Setting LTO Type to FULL..."
     echo "=========================================="
-    sscripts/config --file "$OUT_DIR/.config" \
+    scripts/config --file "$OUT_DIR/.config" \
         -d CONFIG_LTO_NONE \
         -d CONFIG_LTO_CLANG_THIN \
         -e CONFIG_LTO_CLANG \
@@ -283,7 +283,7 @@ elif [ "$LTO_TYPE" = "thin" ]; then
     echo "=========================================="
     echo "[+] Setting LTO Type to THIN..."
     echo "=========================================="
-    sscripts/config --file "$OUT_DIR/.config" \
+    scripts/config --file "$OUT_DIR/.config" \
         -d CONFIG_LTO_NONE \
         -d CONFIG_LTO_CLANG_FULL \
         -e CONFIG_LTO_CLANG \
@@ -293,7 +293,7 @@ elif [ "$LTO_TYPE" = "none" ]; then
     echo "=========================================="
     echo "[+] Disabling LTO..."
     echo "=========================================="
-    sscripts/config --file "$OUT_DIR/.config" \
+    scripts/config --file "$OUT_DIR/.config" \
         -d CONFIG_LTO_CLANG \
         -d CONFIG_LTO_CLANG_FULL \
         -d CONFIG_LTO_CLANG_THIN \
@@ -306,7 +306,7 @@ if [ "$ENABLE_AUTOFDO" = "true" ]; then
     echo "=========================================="
     echo "[+] Enabling AutoFDO for Android 15/16..."
     echo "=========================================="
-    sscripts/config --file "$OUT_DIR/.config" \
+    scripts/config --file "$OUT_DIR/.config" \
         -e CONFIG_AUTOFDO_CLANG
     make O="$OUT_DIR" CC=clang LLVM=1 LLVM_IAS=1 olddefconfig || exit 1
     
