@@ -10,7 +10,7 @@ env:
 
 jobs:
   build-kernel:
-    name: "${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}"
+    name: "${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.hardened == 'on' && '-hardened' || '' }}"
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -20,6 +20,7 @@ jobs:
           - { id: 1000, name: performance }
         variant: [stock, root, susfs]
         root: [none, ksu-next, sukisu, resukisu, mambosu]
+        hardened: [off, on]
         exclude:
           - variant: stock
             root: ksu-next
@@ -74,12 +75,12 @@ jobs:
             hz=${{ matrix.hz.id }} \
             variant=${{ matrix.variant }} \
             root=${{ matrix.root }} \
-            hardened=off \
+            hardened=${{ matrix.hardened }} \
             lto=thin
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}
+          name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.hardened == 'on' && '-hardened' || '' }}
           path: gki-clo/Kono-Ha-Release
           retention-days: 7
