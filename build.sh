@@ -211,12 +211,58 @@ check_clang() {
 
 export ARCH=arm64 SUBARCH=arm64
 
+# Clang optimization
 EXTREME_CLANG_FLAGS=(
-    -O2 -mcpu=cortex-x4 -mtune=cortex-x4 -mno-fmv -mno-outline-atomics -Wno-all
-    -fomit-frame-pointer -fslp-vectorize -fmerge-all-constants -fdelete-null-pointer-checks
-    -moutline -mharden-sls=none -mbranch-protection=none -fno-semantic-interposition
-    -fno-stack-protector -fno-math-errno -fno-trapping-math -fno-signed-zeros
-    -fassociative-math -freciprocal-math
+    -O2
+    -mcpu=cortex-x4
+    -mtune=cortex-x4
+    # -fsplit-machine-functions (causes ld.lld orphaned section errors 'text.split.*')
+    -mno-fmv
+    -mno-outline-atomics
+    -Wno-all
+    
+    # inline thresholds
+    # -mllvm -inline-threshold=200
+    # -mllvm -unroll-threshold=75
+    # -falign-loops=32
+    # -funroll-loops
+    # -finline-functions
+    -fomit-frame-pointer
+    # functions & vectors
+    # -ffunction-sections (causes ld.lld orphaned section errors in vmlinux)
+    -fslp-vectorize
+    # -fdata-sections // error is being placed in '.init.bss.cmdline.o' section, which is not supported by the current linker script
+    -fmerge-all-constants
+    -fdelete-null-pointer-checks
+    -moutline 
+    # No safeties (Raw Performance)
+    -mharden-sls=none
+    -mbranch-protection=none
+    -fno-semantic-interposition
+    -fno-stack-protector
+    -fno-math-errno
+    -fno-trapping-math
+    -fno-signed-zeros
+    -fassociative-math
+    -freciprocal-math
+    
+
+    # polly flags
+    # -Xclang -load -Xclang LLVMPolly.so
+    # -mllvm -polly
+    # -mllvm -polly-ast-use-context
+    # -mllvm -polly-vectorizer=stripmine
+    # -mllvm -polly-invariant-load-hoisting
+    # -mllvm -polly-enable-simplify
+    # -mllvm -polly-reschedule
+    # -mllvm -polly-postopts
+    # -mllvm -polly-tiling
+    # -mllvm -polly-2nd-level-tiling
+    # -mllvm -polly-register-tiling
+    # -mllvm -polly-pattern-matching-based-opts
+    # -mllvm -polly-matmul-opt
+    # -mllvm -polly-tc-opt
+    # -mllvm -polly-process-unprofitable
 )
 KERNEL_KCFLAGS="-w ${EXTREME_CLANG_FLAGS[*]}"
 KERNEL_LDFLAGS="-O2 --icf=all -mllvm -enable-new-pm=1"
@@ -266,8 +312,26 @@ if [ "$AUTOFDO" == "on" ]; then
     [ ! -f "$AFDO_PROFILE" ] && { echo "[-] AutoFDO profile not found!"; exit 1; }
 fi
 
-# Debug reduction (GKI ABI-safe only)
-scripts/config --file "$OUT_DIR/.config" -e CONFIG_DEBUG_INFO_REDUCED -d CONFIG_DEBUG_MISC
+# Reduce debug overhead for production kernel
+# NOTE: Each config was verified against android/abi_gki_aarch64_qcom.
+# CONFIG_SCHED_DEBUG and CONFIG_SLUB_DEBUG are NOT disabled — they export
+# ABI symbols (sched_feat_keys, get_each_object_track, get_slabinfo).
+# CONFIG_KASAN cannot be compiled out — vendor modules depend on
+# kasan_flag_enabled. We disable it at runtime via kasan=off cmdline.
+echo "=========================================="
+echo "[+] Applying debug reduction configs..."
+echo "=========================================="
+scripts/config --file "$OUT_DIR/.config" \
+    -e CONFIG_DEBUG_INFO_REDUCED \
+    -d CONFIG_DEBUG_MISC
+    # -d CONFIG_UBSAN -d CONFIG_UBSAN_BOUNDS -d CONFIG_UBSAN_ARRAY_BOUNDS -d CONFIG_UBSAN_LOCAL_BOUNDS -d CONFIG_UBSAN_SANITIZE_ALL -d CONFIG_UBSAN_TRAP
+    # -d CONFIG_SCHEDSTATS
+    # -d CONFIG_DEBUG_MEMORY_INIT
+    # -d CONFIG_CMA_DEBUGFS
+    # -d CONFIG_BT_DEBUGFS
+    # -d CONFIG_RCU_TRACE
+    # -d CONFIG_PROFILING
+    # -d CONFIG_PRINTK_CALLER
 
 # KASAN runtime disable (can't compile out — ABI symbol kasan_flag_enabled)
 CURRENT_CMDLINE=$(grep '^CONFIG_CMDLINE=' "$OUT_DIR/.config" | sed 's/^CONFIG_CMDLINE="//' | sed 's/"$//')
