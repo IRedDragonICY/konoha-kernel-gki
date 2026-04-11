@@ -44,9 +44,9 @@ if [ -z "$HZ" ]; then
     echo "=========================================="
     echo "         Select Timer Frequency           "
     echo "=========================================="
-    echo " 1) 100 HZ  (Battery)"
-    echo " 2) 250 HZ  (Balance - default)"
-    echo " 3) 1000 HZ (Performance)"
+    echo " 1) 100 HZ  (powersave)"
+    echo " 2) 250 HZ  (balance - default)"
+    echo " 3) 1000 HZ (performance)"
     read -p "Enter choice [1-3] (default 2): " _c
     case "${_c:-2}" in 1) HZ=100 ;; 3) HZ=1000 ;; *) HZ=250 ;; esac
 fi
@@ -302,7 +302,7 @@ ZIP_SUFFIX=""
 [ "$VARIANT" == "susfs" ] && ZIP_SUFFIX="-$REPO_NAME-susfs-v2.1"
 
 HZ_LABEL=""
-case "$HZ" in 100) HZ_LABEL="-battery" ;; 1000) HZ_LABEL="-perf" ;; *) HZ_LABEL="-balance" ;; esac
+case "$HZ" in 100) HZ_LABEL="-powersave" ;; 1000) HZ_LABEL="-performance" ;; *) HZ_LABEL="-balance" ;; esac
 
 ZIP_NAME="Kono-Ha${ZIP_SUFFIX}${HZ_LABEL}-$TIME.zip"
 cd "$TEMP_DIR" && zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder > /dev/null && cd ..
