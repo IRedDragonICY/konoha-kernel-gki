@@ -147,15 +147,13 @@ else
         if [ ! -d "$SUSFS_DIR" ]; then
             git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android15-6.6-dev "$SUSFS_DIR"
         else
-            (cd "$SUSFS_DIR" && git reset --hard && git pull || true)
+            (cd "$SUSFS_DIR" && git fetch origin && git reset --hard origin/gki-android15-6.6-dev || true)
         fi
 
-        # Layout detection + SUSFS version
-        if [ -d "$MODULES_DIR/$REPO_NAME/kernel/core" ]; then
-            (cd "$SUSFS_DIR" && git reset --hard 6b1badb)
-        else
-            (cd "$SUSFS_DIR" && git reset --hard 89b1422)
-        fi
+        # Always use latest SUSFS kernel sources — the kernel tree's committed hooks
+        # (fs/open.c, fs/stat.c, fs/namei.c, etc.) require the latest susfs_def.h macros
+        # (SUSFS_IS_INODE_OPEN_REDIRECT, etc.) and susfs.c functions that only exist at 6b1badb.
+        (cd "$SUSFS_DIR" && git reset --hard 6b1badb)
 
         echo "[+] Injecting SUSFS kernel sources..."
         cp "$SUSFS_DIR/kernel_patches/fs/susfs.c" "$KERNEL_DIR/fs/susfs.c"
@@ -163,12 +161,27 @@ else
         [ -f "$SUSFS_DIR/kernel_patches/include/linux/susfs_def.h" ] && \
             cp "$SUSFS_DIR/kernel_patches/include/linux/susfs_def.h" "$KERNEL_DIR/include/linux/susfs_def.h"
 
-        echo "[+] Patching $REPO_NAME for SUSFS..."
-        (cd "$MODULES_DIR/$REPO_NAME" && \
-         patch -p1 --forward -f --reject-file=- < "$SUSFS_DIR/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true)
+        # Fix susfs_def.h: the 6b1badb version uses 'current', 'current_uid()',
+        # 'test_ti_thread_flag()', etc. but doesn't include the required headers.
+        SUSFS_DEF_H="$KERNEL_DIR/include/linux/susfs_def.h"
+        if [ -f "$SUSFS_DEF_H" ] && ! grep -q "linux/sched.h" "$SUSFS_DEF_H" 2>/dev/null; then
+            sed -i '/#include <linux\/bits.h>/a\
+#include <linux\/sched.h>\
+#include <linux\/thread_info.h>\
+#include <linux\/cred.h>\
+#include <asm\/current.h>' "$SUSFS_DEF_H"
+        fi
 
-        echo "[+] Running SUSFS compatibility fixup..."
-        bash "$KERNEL_DIR/ksu_susfs_fixup.sh" "$MODULES_DIR/$REPO_NAME/kernel"
+        if grep -q "config KSU_SUSFS" "$MODULES_DIR/$REPO_NAME/kernel/Kconfig" 2>/dev/null; then
+            echo "[+] $REPO_NAME already has native SUSFS integration. Skipping patch and fixup..."
+        else
+            echo "[+] Patching $REPO_NAME for SUSFS..."
+            (cd "$MODULES_DIR/$REPO_NAME" && \
+             patch -p1 --forward -f --reject-file=- < "$SUSFS_DIR/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true)
+
+            echo "[+] Running SUSFS compatibility fixup..."
+            bash "$KERNEL_DIR/ksu_susfs_fixup.sh" "$MODULES_DIR/$REPO_NAME/kernel"
+        fi
     fi
 
     echo "[+] Symlinking $REPO_NAME to drivers/kernelsu..."

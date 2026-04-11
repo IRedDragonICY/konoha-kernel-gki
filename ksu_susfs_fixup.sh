@@ -16,6 +16,7 @@ fi
 # ==========================================
 # Layout Detection
 # ==========================================
+KBUILD="$KSU_KERNEL/Kbuild"
 if [ -d "$KSU_KERNEL/core" ]; then
     LAYOUT="NEW"
     # NEW layout paths
@@ -28,6 +29,7 @@ if [ -d "$KSU_KERNEL/core" ]; then
     SUPERCALL_H="$KSU_KERNEL/supercall/supercall.h"
     KSUD_H="$KSU_KERNEL/runtime/ksud.h"
     KSUD_INT_C="$KSU_KERNEL/runtime/ksud_integration.c"
+    APP_PROFILE_C="$KSU_KERNEL/policy/app_profile.c"
     KUMOUNT_C="$KSU_KERNEL/feature/kernel_umount.c"
     KSU_H="$KSU_KERNEL/include/ksu.h"
     RULES_C="$KSU_KERNEL/selinux/rules.c"
@@ -95,10 +97,9 @@ if [ -f "$RULES_C" ] && ! grep -q "susfs_set_zygote_sid" "$RULES_C" 2>/dev/null;
                 sed -i "/^#endif/i void ${fn}(void);" "$SELINUX_H"
         done
     fi
-    # Add calls before the FIRST reset_avc_cache only
-    if grep -q "reset_avc_cache" "$RULES_C" 2>/dev/null; then
-        sed -i '0,/reset_avc_cache/{/reset_avc_cache/i\\tsusfs_set_init_sid();\n\tsusfs_set_ksu_sid();\n\tsusfs_set_zygote_sid();
-        }' "$RULES_C"
+    # Add calls before the reset_avc_cache() CALL only
+    if grep -q "reset_avc_cache();" "$RULES_C" 2>/dev/null; then
+        sed -i 's/^[ \t]*reset_avc_cache();/\tsusfs_set_init_sid();\n\tsusfs_set_ksu_sid();\n\tsusfs_set_zygote_sid();\n\treset_avc_cache();/' "$RULES_C"
     fi
     echo "[SUSFS-Fixup] selinux/rules.c: Added susfs SID init calls"
 fi
@@ -152,12 +153,6 @@ if [ -f "$SUCOMPAT_H" ] && ! grep -q "ksu_handle_execveat_init" "$SUCOMPAT_H" 2>
 int ksu_handle_execveat_init(struct filename *filename,\
     struct user_arg_ptr *argv_user, struct user_arg_ptr *envp_user);\
 #endif' "$SUCOMPAT_H"
-    else
-        sed -i '/^#endif/i \
-#ifdef CONFIG_KSU_SUSFS\
-int ksu_handle_execveat_init(struct filename *filename,\
-    struct user_arg_ptr *argv_user, struct user_arg_ptr *envp_user);\
-#endif' "$SUCOMPAT_H" 2>/dev/null || true
     fi
 fi
 
@@ -318,6 +313,20 @@ KSUD_COMPAT_EOF
         echo "[SUSFS-Fixup] ksud: Added compatibility wrappers"
     fi
 
+    # Fix for Sukisu/Custom roots: Remove undefined symbol references if hook objects are not compiled
+    if [ -f "$KBUILD" ]; then
+        if ! grep -q "tp_marker.o" "$KBUILD" 2>/dev/null && [ -f "$APP_PROFILE_C" ]; then
+            sed -i '/ksu_set_task_tracepoint_flag/d' "$APP_PROFILE_C"
+            sed -i '/ksu_clear_task_tracepoint_flag/d' "$APP_PROFILE_C"
+            echo "[SUSFS-Fixup] app_profile: Removed tracepoint calls (tp_marker.o not compiled)"
+        fi
+        if ! grep -q "syscall_event_bridge.o" "$KBUILD" 2>/dev/null && [ -f "$KSUD_INT_C" ]; then
+            sed -i '/extern void ksu_stop_ksud_execve_hook/d' "$KSUD_INT_C"
+            sed -i '/ksu_stop_ksud_execve_hook/d' "$KSUD_INT_C"
+            echo "[SUSFS-Fixup] ksud_integration: Removed execve_hook stop calls (syscall_event_bridge.o not compiled)"
+        fi
+    fi
+
     # Fix extern ksu_handle_execveat_init → use include
     if [ -f "$KSUD_INT_C" ] && grep -q "extern int ksu_handle_execveat_init" "$KSUD_INT_C" 2>/dev/null; then
         if ! grep -q "feature/sucompat.h" "$KSUD_INT_C" 2>/dev/null; then
@@ -359,25 +368,152 @@ if [ "$LAYOUT" == "OLD" ]; then
         fi
     fi
 
-    # ksu.c: Add setuid_hook.h and sucompat.h includes for SUSFS path
-    if [ -f "$INIT_C" ] && ! grep -q '"setuid_hook.h"' "$INIT_C" 2>/dev/null; then
-        if grep -q '"syscall_hook_manager.h"' "$INIT_C" 2>/dev/null; then
-            # Already wrapped by patch or above — ensure includes exist
-            sed -i '/"sucompat.h"/!{/"syscall_hook_manager.h"/a\
-#else\
-#include "setuid_hook.h"\
-#include "sucompat.h"
-}' "$INIT_C" 2>/dev/null || true
+    # ksu.c: Wrap syscall_hook_manager.h include with CONFIG_KSU_SUSFS guard
+    # and add SUSFS alternative includes. Also wrap init/exit calls.
+    if [ -f "$INIT_C" ] && grep -q '#include "syscall_hook_manager.h"' "$INIT_C" 2>/dev/null; then
+        # Wrap the include with #ifndef/#else/#endif
+        if ! grep -q 'CONFIG_KSU_SUSFS' "$INIT_C" 2>/dev/null; then
+            sed -i 's|^#include "syscall_hook_manager.h"|#ifndef CONFIG_KSU_SUSFS\n#include "syscall_hook_manager.h"\n#else\n#include "setuid_hook.h"\n#include "sucompat.h"\n#endif // #ifndef CONFIG_KSU_SUSFS|' "$INIT_C"
+            # Wrap ksu_syscall_hook_manager_init() call
+            sed -i 's|^\(\s*\)ksu_syscall_hook_manager_init();|\1#ifndef CONFIG_KSU_SUSFS\n\1ksu_syscall_hook_manager_init();\n\1#else\n\1ksu_setuid_hook_init();\n\1ksu_sucompat_init();\n\1#endif|' "$INIT_C"
+            # Wrap ksu_syscall_hook_manager_exit() call
+            sed -i 's|^\(\s*\)ksu_syscall_hook_manager_exit();|\1#ifndef CONFIG_KSU_SUSFS\n\1ksu_syscall_hook_manager_exit();\n\1#endif|' "$INIT_C"
+            # Add susfs.h include if not already present
+            if ! grep -q 'linux/susfs.h' "$INIT_C" 2>/dev/null; then
+                sed -i '/#include <linux\/fs.h>/a\
+#include <linux\/susfs.h>' "$INIT_C"
+            fi
+            echo "[SUSFS-Fixup] ksu.c: Wrapped syscall_hook_manager with CONFIG_KSU_SUSFS guards"
         fi
     fi
 
-    # supercalls.c: Add susfs include + CMD_SUSFS handler
-    if [ -f "$SUPERCALL_C" ] && ! grep -q "CMD_SUPERCALL_SUSFS" "$SUPERCALL_C" 2>/dev/null; then
-        # The patch added some parts but missed the main susfs command handler
-        # For OLD layout, the supercall dispatch is simpler — check if susfs_supercall exists
-        if ! grep -q "susfs_supercall" "$SUPERCALL_C" 2>/dev/null; then
-            echo "[SUSFS-Fixup] supercalls.c: Note — susfs_supercall may need manual integration"
+    # ksud.c: Revert catastrophic patch damage on OLD layout (MamboSU removes hooks entirely)
+    if [ -f "$KSUD_C" ] && grep -q "ksu_init_rc_hook" "$KSUD_C" 2>/dev/null; then
+        (cd "$KSU_KERNEL/.." && git checkout kernel/ksud.c 2>/dev/null || true)
+        # The patch injected user_arg_ptr into ksud.h, so we must remove the native definition from ksud.c to avoid redefinition
+        sed -i '/^struct user_arg_ptr {/,/^};/d' "$KSUD_C"
+        echo "[SUSFS-Fixup] ksud.c: Reverted patch damage (MamboSU uses native hooks)"
+    fi
+
+    # supercalls.c: Revert to native and surgically inject SUSFS
+    # The SUSFS KSU patch causes catastrophic damage to MamboSU's supercalls.c:
+    # - It strips ALL #ifndef/#else/#endif guards, breaking ksys_close/close_fd version checks
+    # - It re-exposes calls to syscall_hook_manager functions that aren't compiled
+    # Strategy: revert to clean native source, then inject ONLY what SUSFS needs.
+    if [ -f "$SUPERCALL_C" ]; then
+        # Revert to pristine native MamboSU source
+        (cd "$KSU_KERNEL/.." && git checkout kernel/supercalls.c 2>/dev/null || true)
+
+        # 1. Add SUSFS includes after #include <linux/fs.h>
+        if ! grep -q "linux/susfs.h" "$SUPERCALL_C" 2>/dev/null; then
+            sed -i '/#include <linux\/fs.h>/a\
+#ifdef CONFIG_KSU_SUSFS\
+#include <linux\/susfs.h>\
+#include <linux\/susfs_def.h>\
+static int ksu_susfs_supercall(unsigned int cmd, void __user **arg);\
+#endif' "$SUPERCALL_C"
         fi
+
+        # 2. Add SUSFS magic check inside ksu_handle_sys_reboot (before native magic check)
+        if ! grep -q "SUSFS_MAGIC" "$SUPERCALL_C" 2>/dev/null; then
+            sed -i '/if (magic1 != KSU_INSTALL_MAGIC1)/i\
+#ifdef CONFIG_KSU_SUSFS\
+    if (magic2 == SUSFS_MAGIC \&\& current_uid().val == 0) {\
+        return ksu_susfs_supercall(cmd, arg);\
+    }\
+#endif' "$SUPERCALL_C"
+        fi
+
+        # Stubs are NOT needed — syscall_hook_manager.c IS compiled for MamboSU
+        # (unlike what we initially assumed). Only the SUSFS handler is needed.
+        cat >> "$SUPERCALL_C" << 'SUSFS_MAMBOSU_EOF'
+
+/* =================================================================== *
+ * SUSFS v2.1 Compatibility Layer for MamboSU
+ * Injected by ksu_susfs_fixup.sh - DO NOT EDIT MANUALLY
+ * =================================================================== */
+#ifdef CONFIG_KSU_SUSFS
+
+/* SUSFS supercall dispatch handler */
+static int ksu_susfs_supercall(unsigned int cmd, void __user **arg)
+{
+    switch (cmd) {
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+    case CMD_SUSFS_ADD_SUS_PATH:
+        susfs_add_sus_path(arg);
+        break;
+    case CMD_SUSFS_ADD_SUS_PATH_LOOP:
+        susfs_add_sus_path_loop(arg);
+        break;
+#endif
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+    case CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS:
+        susfs_set_hide_sus_mnts_for_non_su_procs(arg);
+        break;
+#endif
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+    case CMD_SUSFS_ADD_SUS_KSTAT:
+        susfs_add_sus_kstat(arg);
+        break;
+    case CMD_SUSFS_UPDATE_SUS_KSTAT:
+        susfs_update_sus_kstat(arg);
+        break;
+#endif
+#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
+    case CMD_SUSFS_SET_UNAME:
+        susfs_set_uname(arg);
+        break;
+#endif
+#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
+    case CMD_SUSFS_ENABLE_LOG:
+        susfs_enable_log(arg);
+        break;
+#endif
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+    case CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG:
+        susfs_set_cmdline_or_bootconfig(arg);
+        break;
+#endif
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+    case CMD_SUSFS_ADD_OPEN_REDIRECT:
+        susfs_add_open_redirect(arg);
+        break;
+#endif
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+    case CMD_SUSFS_ADD_SUS_MAP:
+        susfs_add_sus_map(arg);
+        break;
+#endif
+    case CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING:
+        susfs_set_avc_log_spoofing(arg);
+        break;
+    case CMD_SUSFS_SHOW_ENABLED_FEATURES:
+        susfs_get_enabled_features(arg);
+        break;
+    case CMD_SUSFS_SHOW_VARIANT:
+        susfs_show_variant(arg);
+        break;
+    case CMD_SUSFS_SHOW_VERSION:
+        susfs_show_version(arg);
+        break;
+    default:
+        pr_info("susfs: no handler for cmd: 0x%x\n", cmd);
+        break;
+    }
+    return 0;
+}
+
+#endif /* CONFIG_KSU_SUSFS */
+SUSFS_MAMBOSU_EOF
+
+        echo "[SUSFS-Fixup] supercalls.c: Reverted + injected SUSFS handler and stubs"
+    fi
+
+    # sucompat.h: Fix 3-argument signature if present
+    if [ -f "$SUCOMPAT_H" ] && grep -q "struct user_arg_ptr \*argv_user" "$SUCOMPAT_H" 2>/dev/null; then
+        sed -i 's/int ksu_handle_execveat_init(struct filename \*filename,/int ksu_handle_execveat_init(struct filename \*filename);/g' "$SUCOMPAT_H"
+        sed -i '/struct user_arg_ptr \*argv_user, struct user_arg_ptr \*envp_user);/d' "$SUCOMPAT_H"
+        echo "[SUSFS-Fixup] sucompat.h: Fixed ksu_handle_execveat_init signature to 1-arg"
     fi
 
     # ksud.c: fix extern ksu_handle_execveat_init if wrong signature
