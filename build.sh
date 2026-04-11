@@ -12,6 +12,8 @@ set -e
 #   autofdo=on|off        AutoFDO (default: off)
 # ==========================================
 
+VERSION="1.0"
+
 # Parse CLI arguments (key=value)
 for arg in "$@"; do
     case "$arg" in
@@ -385,7 +387,7 @@ ZIP_SUFFIX=""
 HZ_LABEL=""
 case "$HZ" in 100) HZ_LABEL="-powersave" ;; 1000) HZ_LABEL="-performance" ;; *) HZ_LABEL="-balance" ;; esac
 
-ZIP_NAME="Kono-Ha${ZIP_SUFFIX}${HZ_LABEL}-$TIME.zip"
+ZIP_NAME="Kono-Ha-${VERSION}${ZIP_SUFFIX}${HZ_LABEL}-$TIME.zip"
 cd "$TEMP_DIR" && zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder > /dev/null && cd ..
 rm -rf "$TEMP_DIR"
 
