@@ -10,7 +10,7 @@ env:
 
 jobs:
   build-kernel:
-    name: "${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.hardened == 'on' && '-hardened' || '' }}"
+    name: "${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}"
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -20,6 +20,7 @@ jobs:
           - { id: 1000, name: performance }
         variant: [stock, root, susfs]
         root: [none, ksu-next, sukisu, resukisu, mambosu]
+        kpm: [off, on]
         hardened: [off, on]
         exclude:
           - variant: stock
@@ -34,6 +35,20 @@ jobs:
             root: none
           - variant: susfs
             root: none
+          - variant: stock
+            kpm: on
+          - variant: root
+            root: ksu-next
+            kpm: on
+          - variant: root
+            root: mambosu
+            kpm: on
+          - variant: susfs
+            root: ksu-next
+            kpm: on
+          - variant: susfs
+            root: mambosu
+            kpm: on
       fail-fast: false
 
     steps:
@@ -75,12 +90,15 @@ jobs:
             hz=${{ matrix.hz.id }} \
             variant=${{ matrix.variant }} \
             root=${{ matrix.root }} \
+            kpm=${{ matrix.kpm }} \
+            kpm_superkey=${{ matrix.kpm == 'on' && secrets.KPM_SUPERKEY || '' }} \
+            kpm_patch=${{ matrix.kpm == 'on' && matrix.root == 'resukisu' && 'off' || 'on' }} \
             hardened=${{ matrix.hardened }} \
-            lto=full
+            lto=${{ matrix.kpm == 'on' && 'thin' || 'full' }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.hardened == 'on' && '-hardened' || '' }}
+          name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}
           path: gki-clo/Kono-Ha-Release
           retention-days: 7

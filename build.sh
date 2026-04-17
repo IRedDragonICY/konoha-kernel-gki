@@ -10,6 +10,7 @@ set -e
 #   root=ksu-next|sukisu|resukisu|mambosu  Root solution (default: ksu-next)
 #   kpm=on|off            KPM support (default: off, sukisu/resukisu only)
 #   kpm_superkey=STRING   KPM SuperKey (required if kpm=on)
+#   kpm_patch=on|off      Inject kpimg with kptools (default: on; resukisu defaults off)
 #   lto=thin|full|none    LTO type (default: thin)
 #   autofdo=on|off        AutoFDO (default: off)
 # ==========================================
@@ -25,6 +26,7 @@ for arg in "$@"; do
         root=*)     ROOT="${arg#*=}" ;;
         kpm=*)      KPM="${arg#*=}" ;;
         kpm_superkey=*) KPM_SUPERKEY="${arg#*=}" ;;
+        kpm_patch=*) KPM_PATCH="${arg#*=}" ;;
         lto=*)      LTO_TYPE="${arg#*=}" ;;
         autofdo=*)  AUTOFDO="${arg#*=}" ;;
     esac
@@ -106,7 +108,9 @@ if [ "$VARIANT" != "stock" ] && echo "$KPM_SUPPORTED_ROOTS" | grep -qw "$ROOT"; 
         [ "${_c:-1}" == "2" ] && KPM="on" || KPM="off"
     fi
     if [ "$KPM" == "on" ] && [ -z "$KPM_SUPERKEY" ]; then
-        read -p "Enter KPM SuperKey (or leave empty to auto-generate): " KPM_SUPERKEY
+        if [ -t 0 ]; then
+            read -p "Enter KPM SuperKey (or leave empty to auto-generate): " KPM_SUPERKEY
+        fi
         if [ -z "$KPM_SUPERKEY" ]; then
             KPM_SUPERKEY=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)
             echo "[+] Auto-generated SuperKey: $KPM_SUPERKEY"
@@ -116,6 +120,12 @@ else
     [ "$KPM" == "on" ] && [ "$VARIANT" != "stock" ] && \
         echo "[!] KPM not supported by $ROOT — forcing off"
     KPM="off"
+fi
+
+# ReSukiSU + runtime kpimg patch is unstable on some devices.
+# Keep KPM compile-time enabled, but default to no post-build injection.
+if [ "$KPM" == "on" ] && [ -z "$KPM_PATCH" ]; then
+    [ "$ROOT" == "resukisu" ] && KPM_PATCH="off" || KPM_PATCH="on"
 fi
 
 # 6. LTO Type
@@ -128,6 +138,12 @@ if [ -z "$LTO_TYPE" ]; then
     echo " 3) NONE (no LTO)"
     read -p "Enter choice [1-3] (default 1): " _c
     case "${_c:-1}" in 2) LTO_TYPE="full" ;; 3) LTO_TYPE="none" ;; *) LTO_TYPE="thin" ;; esac
+fi
+
+# KPM builds are more stable with thin LTO.
+if [ "$KPM" == "on" ] && [ "$LTO_TYPE" == "full" ]; then
+    echo "[!] KPM with FULL LTO is unstable, forcing LTO=thin"
+    LTO_TYPE="thin"
 fi
 
 # ==========================================
@@ -161,6 +177,7 @@ if [ "$VARIANT" == "susfs" ]; then
 fi
 if [ "$KPM" == "on" ]; then
     echo " KPM:       ENABLED"
+    echo " KPM Patch: ${KPM_PATCH^^}"
     echo " SuperKey:  ${KPM_SUPERKEY:0:4}****"
 fi
 echo "=========================================="
@@ -232,15 +249,14 @@ else
         ln -sfn ../uapi "$MODULES_DIR/$REPO_NAME/kernel/uapi"
     fi
 
-    # SukiSU KPM header compatibility:
-    # kpm/kpm.h may include "uapi/supercall.h", which is not in compiler include
-    # search path from kpm/. Rewrite to repo-root relative include when needed.
+    # SukiSU KPM header compatibility fixes
     if [ "$ROOT" == "sukisu" ] && [ "$KPM" == "on" ]; then
         KPM_HEADER="$MODULES_DIR/$REPO_NAME/kernel/kpm/kpm.h"
         KPM_COMPACT="$MODULES_DIR/$REPO_NAME/kernel/kpm/compact.c"
         SUPERCALL_UAPI="$MODULES_DIR/$REPO_NAME/uapi/supercall.h"
         ALLOWLIST_H="$MODULES_DIR/$REPO_NAME/kernel/policy/allowlist.h"
         KSU_KBUILD="$MODULES_DIR/$REPO_NAME/kernel/Kbuild"
+
         if [ -f "$KPM_HEADER" ] && grep -q '#include "uapi/supercall.h"' "$KPM_HEADER" 2>/dev/null; then
             sed -i 's|#include "uapi/supercall.h"|#include "../../uapi/supercall.h"|' "$KPM_HEADER"
             echo "[+] Patched SukiSU KPM header include path"
@@ -513,6 +529,8 @@ if [ "$KPM" == "on" ]; then
 
     echo "[+] KPM patching successful"
     echo "[+] SuperKey: $KPM_SUPERKEY"
+elif [ "$KPM" == "on" ]; then
+    echo "[!] KPM runtime patching skipped (kpm_patch=off)"
 fi
 
 # ==========================================
