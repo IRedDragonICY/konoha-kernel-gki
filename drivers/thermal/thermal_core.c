@@ -807,7 +807,7 @@ static void thermal_release(struct device *dev)
 		tz = to_thermal_zone(dev);
 		thermal_zone_destroy_device_groups(tz);
 		mutex_destroy(&tz->lock);
-		kfree(tz);
+		complete(&tz->removal);
 	} else if (!strncmp(dev_name(dev), "cooling_device",
 			    sizeof("cooling_device") - 1)) {
 		cdev = to_cooling_device(dev);
@@ -1302,6 +1302,7 @@ thermal_zone_device_register_with_trips(const char *type, struct thermal_trip *t
 	INIT_LIST_HEAD(&tz->node);
 	ida_init(&tz->ida);
 	mutex_init(&tz->lock);
+	init_completion(&tz->removal);
 	id = ida_alloc(&thermal_tz_ida, GFP_KERNEL);
 	if (id < 0) {
 		result = id;
@@ -1490,6 +1491,8 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 	kfree(tz->tzp);
 
 	put_device(&tz->device);
+	wait_for_completion(&tz->removal);
+	kfree(tz);
 
 	thermal_notify_tz_delete(tz_id);
 }

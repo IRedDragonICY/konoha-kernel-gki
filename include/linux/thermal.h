@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/sysfs.h>
 #include <linux/workqueue.h>
+#include <linux/completion.h>
 #include <linux/android_kabi.h>
 #include <uapi/linux/thermal.h>
 
@@ -192,6 +193,7 @@ struct thermal_zone_device {
 	struct delayed_work poll_queue;
 	enum thermal_notify_event notify_event;
 	bool suspended;
+	struct completion removal;
 
 	ANDROID_KABI_RESERVE(1);
 };
