@@ -103,3 +103,31 @@ jobs:
           name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}
           path: gki-clo/Kono-Ha-Release
           retention-days: 7
+  release:
+    needs: build-kernel
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Prepare assets
+        run: |
+          mkdir -p release_assets
+          find artifacts -type f -name "*.zip" -exec mv {} release_assets/ \; || true
+          find artifacts -type f -name "*.img" -exec mv {} release_assets/ \; || true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}-${{ github.sha }}
+          name: Build ${{ github.sha }}
+          body: |
+            Automated kernel build.
+            Commit: ${{ github.sha }}
+            Ref: ${{ github.ref }}
+          files: release_assets/*
