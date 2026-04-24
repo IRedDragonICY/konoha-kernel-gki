@@ -36,10 +36,6 @@ static void susfs_bootstrap_once(void)
        mutex_unlock(&susfs_bootstrap_lock);
 }
 
-bool ksu_init_rc_hook __read_mostly __weak;
-bool ksu_execveat_hook __read_mostly __weak;
-bool ksu_input_hook __read_mostly __weak;
-
 u32 susfs_ksu_sid __read_mostly __weak;
 u32 susfs_priv_app_sid __read_mostly __weak;
 

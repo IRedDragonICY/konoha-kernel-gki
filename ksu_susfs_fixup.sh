@@ -71,7 +71,10 @@ MANAGER=$(detect_manager "$KSU_KERNEL" "$MANAGER_HINT")
 echo "[SUSFS-Fixup] Manager: $MANAGER"
 
 if [ "$MANAGER" = "resukisu" ]; then
-    echo "[SUSFS-Fixup] ReSukiSU has native SUSFS — nothing to fix."
+    echo "[SUSFS-Fixup] ReSukiSU has native SUSFS — applying typo fix."
+    if [ -f "$KSU_KERNEL/runtime/ksud_integration.c" ]; then
+        sed -i 's/ksu_init_rc_hook_key_false/ksu_is_init_rc_hook_enabled/g' "$KSU_KERNEL/runtime/ksud_integration.c"
+    fi
     exit 0
 fi
 
@@ -710,9 +713,10 @@ void ksu_execve_hook_ksud(const struct pt_regs *regs)
 
 void ksu_stop_input_hook_runtime(void)
 {
-    extern bool ksu_input_hook;
-    ksu_input_hook = false;
-    pr_info("ksu_input_hook: %d\n", ksu_input_hook);
+    extern struct static_key_true ksu_is_input_hook_enabled;
+    if (static_key_enabled(&ksu_is_input_hook_enabled))
+        static_branch_disable(&ksu_is_input_hook_enabled);
+    pr_info("ksu_is_input_hook_enabled disabled\n");
 }
 KSUD_COMPAT_EOF
         echo "[SUSFS-Fixup] ksud_integration.c: Added compat wrappers"
