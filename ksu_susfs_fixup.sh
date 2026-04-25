@@ -759,6 +759,7 @@ case "$MANAGER" in
         fix_ksu_next_bridge
         fix_ksu_next_supercall
         fix_ksu_next_ksud
+        fix_execveat_handlers
         ;;
     *)
         echo "[SUSFS-Fixup] Unknown manager '$MANAGER' — applying best-effort fixes"
