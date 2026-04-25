@@ -2550,6 +2550,25 @@ void flush_module_init_free_work(void)
 static bool async_probe;
 module_param(async_probe, bool, 0644);
 
+#ifdef CONFIG_ARM64
+#include <asm/patching.h>
+
+static void mca_live_patch(struct module *mod)
+{
+	if (!mod || !mod->name)
+		return;
+	/* Bypass charging */
+	if (strcmp(mod->name, "mca_smart_charge") == 0) {
+		void *text = mod->mem[MOD_TEXT].base;
+		if (text) {
+			pr_info("Live-patching mca_smart_charge %p\n", text);
+			/* Force jump to bypass continue: b +0x144 (b.lt 2124 -> b 2258) */
+			aarch64_insn_patch_text_nosync(text + 0x2114, 0x14000051);
+		}
+	}
+}
+#endif
+
 /*
  * This is where the real work happens.
  *
@@ -2571,6 +2590,10 @@ static noinline int do_init_module(struct module *mod)
 				text_size += mod_mem->size;
 		}
 	}
+#endif
+
+#ifdef CONFIG_ARM64
+	mca_live_patch(mod);
 #endif
 
 	freeinit = kmalloc(sizeof(*freeinit), GFP_KERNEL);
