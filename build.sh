@@ -555,9 +555,16 @@ done
 
 # Build filename
 ZIP_SUFFIX=""
-[ "$VARIANT" == "root" ] && ZIP_SUFFIX="-$REPO_NAME"
-[ "$VARIANT" == "susfs" ] && ZIP_SUFFIX="-$REPO_NAME-susfs-v2.1"
+if [ "$VARIANT" == "stock" ]; then
+    ZIP_SUFFIX="-stock"
+elif [ "$VARIANT" == "root" ]; then
+    ZIP_SUFFIX="-root-$REPO_NAME"
+elif [ "$VARIANT" == "susfs" ]; then
+    ZIP_SUFFIX="-susfs-$REPO_NAME-v2.1"
+fi
+
 [ "$KPM" == "on" ] && ZIP_SUFFIX="${ZIP_SUFFIX}-kpm"
+[ "$HARDENED" == "on" ] && ZIP_SUFFIX="${ZIP_SUFFIX}-hardened"
 
 HZ_LABEL=""
 case "$HZ" in 100) HZ_LABEL="-powersave" ;; 500) HZ_LABEL="-performance" ;; 1000) HZ_LABEL="-ultra-performance" ;; *) HZ_LABEL="-balance" ;; esac
