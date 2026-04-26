@@ -15,7 +15,7 @@ set -e
 #   autofdo=on|off        AutoFDO (default: off)
 # ==========================================
 
-VERSION="1.0"
+VERSION="1.1"
 
 # Parse CLI arguments (key=value)
 for arg in "$@"; do
