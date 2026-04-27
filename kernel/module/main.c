@@ -2550,44 +2550,262 @@ void flush_module_init_free_work(void)
 static bool async_probe;
 module_param(async_probe, bool, 0644);
 
+/*
+ * MCA Bypass Charging Enhancement
+ *
+ * Xiaomi's MCA (MI Charge Architecture) uses vendor kernel modules to manage
+ * charging. These modules run on the AP side and communicate with the ADSP
+ * charging co-processor. This section intercepts and patches MCA module
+ * behavior at load time to improve bypass charging performance.
+ *
+ * Bypass charging routes adapter power directly to the system bus, skipping
+ * the battery. Stock firmware limits bypass to ~7W via a 10-step ICL stepper
+ * that progressively reduces input current. These patches remove that
+ * throttling, achieving ~13W sustained bypass on the 5V buck path.
+ *
+ * Patches applied (10 total across 4 modules + 1 kprobe):
+ *
+ *   mca_smart_charge:
+ *     [1] Force Game Turbo bypass regardless of SOC range
+ *     [2] Force Smart Night bypass at any SOC level
+ *     [3] Prevent bypass timeout cycling in check_bypass_status
+ *
+ *   mca_strategy_quickchg:
+ *     [6] Remove SOC > 90% quick-charge exit check
+ *     [7] Remove regulation limit check
+ *     [8] Keep charge pump alive during bypass (prevent CP->buck fallback)
+ *
+ *   mca_strategy_buckchg:
+ *     [9]  Force non-stepper path in soc_limit callback (no ICL throttle)
+ *     [10] Skip step-10 input_suspend vote (safety net)
+ *
+ *   mca_strategy_fg_comp:
+ *     [4] Remove fuel gauge compensation low-threshold check
+ *     [5] Remove fuel gauge compensation high-threshold check
+ *
+ *   kprobe on mca_vote():
+ *     - Override thermal/wire/jeita current limits to 5000mA
+ *     - Override voltage limits to 11000mV
+ */
 #ifdef CONFIG_ARM64
 #include <asm/patching.h>
+#include <linux/kprobes.h>
 
+/* ========================================================================
+ * Kprobe Handler: Intercept mca_vote() to override charging limits
+ *
+ * mca_vote(voter, client, state, val) is the central voting mechanism
+ * in MCA. Each subsystem votes on charging parameters (ICL, ICHG, voltage).
+ * The effective value is determined by the lowest active vote.
+ *
+ * We intercept votes that throttle current/voltage and force higher values.
+ * ======================================================================== */
+static int pre_mca_vote(struct kprobe *p, struct pt_regs *regs)
+{
+	void *voter = (void *)regs->regs[0];
+	const char *client = (const char *)regs->regs[1];
+	int state = (int)regs->regs[2];
+	int val = (int)regs->regs[3];
+	const char *voter_name_ptr = NULL;
+	char voter_name[32] = {0};
+
+	if (voter) {
+		if (get_kernel_nofault(voter_name_ptr, (const char **)voter) == 0) {
+			if (voter_name_ptr && (unsigned long)voter_name_ptr > 0x1000) {
+				strncpy_from_kernel_nofault(voter_name, voter_name_ptr,
+							    sizeof(voter_name) - 1);
+			}
+		}
+	}
+
+	if (state == 1 && client && (unsigned long)client > 0x1000) {
+		/*
+		 * Current limit voters (mA) -- force to 5000mA (5A).
+		 * These voters throttle input/charge current based on
+		 * thermal policy, cable type, JEITA spec, and USB enumeration.
+		 */
+		if (strcmp(client, "mca_thermal") == 0 ||
+		    strcmp(client, "wire_chg_type") == 0 ||
+		    strcmp(client, "icl_limit") == 0 ||
+		    strcmp(client, "jeita") == 0 ||
+		    strcmp(client, "usbicl") == 0 ||
+		    strcmp(client, "sdpicl") == 0) {
+			if (val >= 50 && val < 5000) {
+				/* pr_info("bypass: boost current %s for %s: %d -> 5000mA\n",
+				 *         client, voter_name, val); */
+				regs->regs[3] = 5000;
+			}
+		}
+
+		/*
+		 * Voltage limit voters (mV) -- force to 11000mV (11V).
+		 * These voters cap the charging voltage based on thermal
+		 * conditions and battery protection thresholds.
+		 */
+		else if (strcmp(client, "volt_thermal_limit") == 0 ||
+			 strcmp(client, "volt_limit") == 0) {
+			if (val > 0 && val < 11000) {
+				/* pr_info("bypass: boost voltage %s for %s: %d -> 11000mV\n",
+				 *         client, voter_name, val); */
+				regs->regs[3] = 11000;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static struct kprobe kp_mca_vote = {
+	.symbol_name = "mca_vote",
+	.pre_handler = pre_mca_vote,
+};
+
+/* ========================================================================
+ * Module Live-Patching: Binary patches applied at module load time
+ *
+ * Called from do_init_module() for each loaded module. We match by name
+ * and patch specific instructions in the .text section using
+ * aarch64_insn_patch_text_nosync().
+ *
+ * Instruction encoding reference:
+ *   NOP:              0xd503201f
+ *   b <offset>:       0x14000000 | (offset / 4)
+ *   mov wN, wzr:      0x2a1f03e0 | N
+ * ======================================================================== */
 static void mca_live_patch(struct module *mod)
 {
+	static bool kp_registered = false;
+
 	if (!mod || !mod->name)
 		return;
-	
+
+	/*
+	 * Register kprobe for mca_vote -- only when mca_common loads,
+	 * as the symbol doesn't exist until this module is present.
+	 * This avoids ~362 spurious registration failures during boot.
+	 */
+	if (!kp_registered && strcmp(mod->name, "mca_common") == 0) {
+		int ret = register_kprobe(&kp_mca_vote);
+		if (ret < 0) {
+			/* pr_err("bypass: register_kprobe failed: %d\n", ret); */
+		} else {
+			/* pr_info("bypass: kprobe registered for mca_vote\n"); */
+			kp_registered = true;
+		}
+	}
+
+	/* --- mca_smart_charge -------------------------------------------- */
 	if (strcmp(mod->name, "mca_smart_charge") == 0) {
 		void *text = mod->mem[MOD_TEXT].base;
-		if (text) {
-			pr_info("Kono-Ha: Live-patching mca_smart_charge %p\n", text);
-			/* 1. User's original patch for Game Turbo Bypass (smart_bypass) */
-			/* Force jump to bypass continue: b +0x144 (b.lt 2124 -> b 2258) */
-			aarch64_insn_patch_text_nosync(text + 0x2114, 0x14000051);
+		if (!text)
+			return;
+		/* pr_info("bypass: patching mca_smart_charge @ %p\n", text); */
 
-			/* 2. NEW: Patch for Smart Night to work at any SOC */
-			/* 24cc: b.ge 2538 -> b 2538 (Unconditional jump to enable bypass) */
-			aarch64_insn_patch_text_nosync(text + 0x24cc, 0x1400001b);
-		}
-	} else if (strcmp(mod->name, "mca_strategy_fg_comp") == 0) {
+		/*
+		 * [1] Force Game Turbo bypass regardless of SOC.
+		 *     smart_charge_workfunc+0x1f4:
+		 *     b.lt 0x2124 -> b 0x2258 (skip SOC range check)
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x2114, 0x14000051);
+
+		/*
+		 * [2] Force Smart Night bypass at any SOC level.
+		 *     smart_charge_soc_limit_workfunc+0x70:
+		 *     b.ge 0x2538 -> b 0x2538 (always enter bypass path)
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x24cc, 0x1400001b);
+
+		/*
+		 * [3] Prevent bypass timeout cycling.
+		 *     smart_charge_check_bypass_status+0x5c:
+		 *     b.le 0x8d4 -> b 0x8d4 (never reset bypass vote)
+		 *
+		 *     Without this, bypass cycles ON/OFF every ~10s as the
+		 *     timeout fires and resets the smart_bypass vote.
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x086c, 0x1400001a);
+	}
+
+	/* --- mca_strategy_fg_comp ---------------------------------------- */
+	else if (strcmp(mod->name, "mca_strategy_fg_comp") == 0) {
 		void *text = mod->mem[MOD_TEXT].base;
-		if (text) {
-			pr_info("Kono-Ha: Live-patching mca_strategy_fg_comp %p\n", text);
-			/* NOP the b.lt 1c84 check */
-			aarch64_insn_patch_text_nosync(text + 0x1708, 0xd503201f);
-			/* NOP the b.gt 2204 check */
-			aarch64_insn_patch_text_nosync(text + 0x1f78, 0xd503201f);
-		}
-	} else if (strcmp(mod->name, "mca_strategy_quickchg") == 0) {
+		if (!text)
+			return;
+		/* pr_info("bypass: patching mca_strategy_fg_comp @ %p\n", text); */
+
+		/* [4] NOP fuel gauge low-threshold check (b.lt 0x1c84) */
+		aarch64_insn_patch_text_nosync(text + 0x1708, 0xd503201f);
+
+		/* [5] NOP fuel gauge high-threshold check (b.gt 0x2204) */
+		aarch64_insn_patch_text_nosync(text + 0x1f78, 0xd503201f);
+	}
+
+	/* --- mca_strategy_quickchg --------------------------------------- */
+	else if (strcmp(mod->name, "mca_strategy_quickchg") == 0) {
 		void *text = mod->mem[MOD_TEXT].base;
-		if (text) {
-			pr_info("Live-patching mca_strategy_quickchg %p\n", text);
-			/* NOP the b.gt 2fd4 check */
-			aarch64_insn_patch_text_nosync(text + 0x2db4, 0xd503201f);
-			/* NOP the b.lt 744c check */
-			aarch64_insn_patch_text_nosync(text + 0x7424, 0xd503201f);
-		}
+		if (!text)
+			return;
+		/* pr_info("bypass: patching mca_strategy_quickchg @ %p\n", text); */
+
+		/*
+		 * [6] Remove SOC > 90% quick-charge exit.
+		 *     NOP the b.gt 0x2fd4 branch that forces quick-charge
+		 *     to exit when battery SOC exceeds 90%.
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x2db4, 0xd503201f);
+
+		/*
+		 * [7] Remove regulation limit check.
+		 *     NOP the b.lt 0x744c branch that triggers a regulation
+		 *     limit log and zeros out the regulation value.
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x7424, 0xd503201f);
+
+		/*
+		 * [8] Keep charge pump alive during bypass.
+		 *     strategy_quickchg_enable_buck_charging+0x4c:
+		 *     tbz w22, #0, 0x5010 -> b 0x50b0 (return immediately)
+		 *
+		 *     When soc_limit fires, this function normally disables
+		 *     the charge pump (CP) and falls back to 5V buck mode.
+		 *     By returning immediately, the CP stays active at ~9V.
+		 *     Note: the ADSP may independently manage CP state, so
+		 *     this is a best-effort optimization.
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x4f64, 0x14000053);
+	}
+
+	/* --- mca_strategy_buckchg ---------------------------------------- */
+	else if (strcmp(mod->name, "mca_strategy_buckchg") == 0) {
+		void *text = mod->mem[MOD_TEXT].base;
+		if (!text)
+			return;
+		/* pr_info("bypass: patching mca_strategy_buckchg @ %p\n", text); */
+
+		/*
+		 * [9] Force non-stepper path in soc_limit callback.
+		 *     strategy_buckchg_soc_limit_sts_callback+0x40:
+		 *     cbz w8, 0x6368 -> b 0x6368 (always take non-stepper)
+		 *
+		 *     The stepper path uses a table at .rodata+0x2dc8 that
+		 *     walks ICL from 1990mA to 0mA across 10 steps (1/sec).
+		 *     The non-stepper path enables bypass without throttling:
+		 *       input_suspend:  state=1, val=0  (no suspend)
+		 *       ichg:           state=1, val=0  (no limit)
+		 *       icl:            state=0          (disabled)
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x6348, 0x14000008);
+
+		/*
+		 * [10] Safety: unconditionally skip input_suspend at step 10.
+		 *      strategy_buckchg_process_soc_limit_change_more+0xec:
+		 *      b.ne 0x4a54 -> b 0x4a54 (always skip suspend vote)
+		 *
+		 *      If the stepper is reached via an alternate path,
+		 *      this prevents it from voting input_suspend = 1
+		 *      which would completely cut charger power.
+		 */
+		aarch64_insn_patch_text_nosync(text + 0x4a48, 0x14000003);
 	}
 }
 #endif
