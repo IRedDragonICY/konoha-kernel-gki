@@ -224,8 +224,10 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
+int ksu_handle_stat_user(int *dfd, const char __user **filename_user, int *flags);
 #else
 int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+#define ksu_handle_stat_user ksu_handle_stat
 #endif
 SUCOMPAT_H_EOF
     else
@@ -245,8 +247,10 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
+int ksu_handle_stat_user(int *dfd, const char __user **filename_user, int *flags);
 #else
 int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+#define ksu_handle_stat_user ksu_handle_stat
 #endif
 SUCOMPAT_H_EOF
     fi
@@ -295,7 +299,7 @@ if [ -f "$SUCOMPAT_C" ]; then
     # Fix ksu_handle_stat for kernel >= 6.1 if not already version-gated
     if grep -q "int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user, int \*flags)" "$SUCOMPAT_C" 2>/dev/null && \
        ! grep -q "KERNEL_VERSION(6, 1, 0)" "$SUCOMPAT_C" 2>/dev/null; then
-        sed -i '/^int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user, int \*flags)/i\
+        sed -i '/^int ksu_handle_stat(int \*dfd, const char __user \*\*filename_user, int \*flags)/c\
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)\
 int ksu_handle_stat(int *dfd, struct filename **filename, int *flags)\
 {\
@@ -305,15 +309,13 @@ int ksu_handle_stat(int *dfd, struct filename **filename, int *flags)\
     memcpy((void *)((*filename)->name), "/system/bin/sh", 15);\
     return 0;\
 }\
-#else' "$SUCOMPAT_C"
-        # Close the #else block after the existing function's closing brace
-        local_funcend=$(grep -n "^int ksu_handle_stat(int \*dfd, const char __user" "$SUCOMPAT_C" | tail -1 | cut -d: -f1)
-        if [ -n "$local_funcend" ]; then
-            # Find the closing brace of this function
-            awk -v start="$local_funcend" 'NR>=start{if(/^}/){print NR; exit}}' "$SUCOMPAT_C" | while read -r endline; do
-                sed -i "${endline}a\\#endif" "$SUCOMPAT_C"
-            done
-        fi
+int ksu_handle_stat_user(int *dfd, const char __user **filename_user, int *flags)\
+#else\
+int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)\
+#endif' "$SUCOMPAT_C"
+        # We don't need the #endif at the end of the function anymore, because the #else/#endif wraps the function signature only.
+        # However, the previous script might have already added #endif at the end of the function if it ran before.
+        # But we are assuming a clean run of the script.
         echo "[SUSFS-Fixup] sucompat.c: Fixed ksu_handle_stat version gate"
     fi
 
@@ -589,24 +591,11 @@ fix_ksu_next_bridge() {
         echo "[SUSFS-Fixup] syscall_event_bridge.c: Fixed setresuid 3-arg"
     fi
 
-    # Guard old-style bridge calls that are incompatible with SUSFS:
-    # - ksu_handle_stat: signature changes to struct filename** for >= 6.1
-    # - ksu_handle_execve_sucompat: guarded out of sucompat.c when SUSFS enabled
-    # When SUSFS is active, VFS hooks (fs/exec.c, fs/stat.c) handle these directly.
-    if ! grep -q "CONFIG_KSU_SUSFS" "$BRIDGE_C" 2>/dev/null; then
-        if grep -q "ksu_handle_stat(dfd, filename_user, flags)" "$BRIDGE_C" 2>/dev/null; then
-            sed -i 's|ksu_handle_stat(dfd, filename_user, flags);|#ifndef CONFIG_KSU_SUSFS\
-    ksu_handle_stat(dfd, filename_user, flags);\
-#endif|' "$BRIDGE_C"
-        fi
-        if grep -q "ksu_handle_execve_sucompat(filename_user, orig_nr, regs)" "$BRIDGE_C" 2>/dev/null; then
-            sed -i 's|return ksu_handle_execve_sucompat(filename_user, orig_nr, regs);|#ifndef CONFIG_KSU_SUSFS\
-        return ksu_handle_execve_sucompat(filename_user, orig_nr, regs);\
-#else\
-        return ksu_syscall_table[orig_nr](regs);\
-#endif|' "$BRIDGE_C"
-        fi
-        echo "[SUSFS-Fixup] syscall_event_bridge.c: Guarded old-style calls for SUSFS"
+    # Fix ksu_handle_stat call signature for KernelSU-Next tracepoints
+    # We renamed it to ksu_handle_stat_user to avoid colliding with VFS hook signature.
+    if grep -q "ksu_handle_stat(dfd, filename_user, flags);" "$BRIDGE_C" 2>/dev/null; then
+        sed -i 's|ksu_handle_stat(dfd, filename_user, flags);|ksu_handle_stat_user(dfd, filename_user, flags);|' "$BRIDGE_C"
+        echo "[SUSFS-Fixup] syscall_event_bridge.c: Renamed ksu_handle_stat to ksu_handle_stat_user"
     fi
 
     # tp_marker.h include
@@ -798,6 +787,17 @@ fix_ksu_next_susfs_umount() {
 \t * Only set for apps that should be umounted (not root-granted apps). */\
 \tif (is_isolated_process(new_uid) ||\
 \t    (is_appuid(new_uid) \&\& ksu_uid_should_umount(new_uid))) {\
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH\
+\t\t{\
+\t\t\textern struct cred *ksu_cred;\
+\t\t\textern void susfs_run_sus_path_loop(void);\
+\t\t\tif (ksu_cred) {\
+\t\t\t\tconst struct cred *saved = override_creds(ksu_cred);\
+\t\t\t\tsusfs_run_sus_path_loop();\
+\t\t\t\trevert_creds(saved);\
+\t\t\t}\
+\t\t}\
+#endif\
 \t\tsusfs_set_current_proc_umounted();\
 \t}\
 #endif' "$SETUID_HOOK_C"
