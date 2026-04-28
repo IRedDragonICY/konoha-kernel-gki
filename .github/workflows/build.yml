@@ -103,6 +103,7 @@ jobs:
           name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}
           path: gki-clo/Kono-Ha-Release
           retention-days: 7
+
   release:
     needs: build-kernel
     runs-on: ubuntu-24.04
@@ -121,55 +122,193 @@ jobs:
           find artifacts -type f -name "*.zip" -exec mv {} release_assets/ \; || true
           find artifacts -type f -name "*.img" -exec mv {} release_assets/ \; || true
 
+      - name: Generate Release Body
+        run: |
+          TAG="build-${{ github.run_number }}-${{ github.sha }}"
+          BASE="https://github.com/${{ github.repository }}/releases/download/$TAG"
+          
+          cat << EOF > release_body.md
+          Automated kernel build.
+          Commit: ${{ github.sha }}
+          Ref: ${{ github.ref }}
+
+          ### Standard / Root Builds
+          | Variant | Powersave | Balance | Performance | Ultra-Performance |
+          |---|---|---|---|---|
+          | **Stock** | [stock-powersave] | [stock-balance] | [stock-performance] | [stock-ultra-performance] |
+          | **KernelSU Next** | [root-ksu-next-powersave] | [root-ksu-next-balance] | [root-ksu-next-performance] | [root-ksu-next-ultra-performance] |
+          | **Sukisu** | [root-sukisu-powersave] | [root-sukisu-balance] | [root-sukisu-performance] | [root-sukisu-ultra-performance] |
+          | **Sukisu + KPM** | [root-sukisu-powersave-kpm] | [root-sukisu-balance-kpm] | [root-sukisu-performance-kpm] | [root-sukisu-ultra-performance-kpm] |
+          | **Resukisu** | [root-resukisu-powersave] | [root-resukisu-balance] | [root-resukisu-performance] | [root-resukisu-ultra-performance] |
+          | **Resukisu + KPM** | [root-resukisu-powersave-kpm] | [root-resukisu-balance-kpm] | [root-resukisu-performance-kpm] | [root-resukisu-ultra-performance-kpm] |
+          | **Mambosu** | [root-mambosu-powersave] | [root-mambosu-balance] | [root-mambosu-performance] | [root-mambosu-ultra-performance] |
+
+          ### SUSFS ඞ
+          | Variant | Powersave | Balance | Performance | Ultra-Performance |
+          |---|---|---|---|---|
+          | **KernelSU Next** | [susfs-ksu-next-powersave] | [susfs-ksu-next-balance] | [susfs-ksu-next-performance] | [susfs-ksu-next-ultra-performance] |
+          | **Sukisu** | [susfs-sukisu-powersave] | [susfs-sukisu-balance] | [susfs-sukisu-performance] | [susfs-sukisu-ultra-performance] |
+          | **Sukisu + KPM** | [susfs-sukisu-powersave-kpm] | [susfs-sukisu-balance-kpm] | [susfs-sukisu-performance-kpm] | [susfs-sukisu-ultra-performance-kpm] |
+          | **Resukisu** | [susfs-resukisu-powersave] | [susfs-resukisu-balance] | [susfs-resukisu-performance] | [susfs-resukisu-ultra-performance] |
+          | **Resukisu + KPM** | [susfs-resukisu-powersave-kpm] | [susfs-resukisu-balance-kpm] | [susfs-resukisu-performance-kpm] | [susfs-resukisu-ultra-performance-kpm] |
+          | **Mambosu** | [susfs-mambosu-powersave] | [susfs-mambosu-balance] | [susfs-mambosu-performance] | [susfs-mambosu-ultra-performance] |
+
+          ### Hardened
+          | Variant | Powersave | Balance | Performance | Ultra-Performance |
+          |---|---|---|---|---|
+          | **Stock** | [stock-powersave-hardened] | [stock-balance-hardened] | [stock-performance-hardened] | [stock-ultra-performance-hardened] |
+          | **KernelSU Next** | [root-ksu-next-powersave-hardened] | [root-ksu-next-balance-hardened] | [root-ksu-next-performance-hardened] | [root-ksu-next-ultra-performance-hardened] |
+          | **Sukisu** | [root-sukisu-powersave-hardened] | [root-sukisu-balance-hardened] | [root-sukisu-performance-hardened] | [root-sukisu-ultra-performance-hardened] |
+          | **Sukisu + KPM** | [root-sukisu-powersave-kpm-hardened] | [root-sukisu-balance-kpm-hardened] | [root-sukisu-performance-kpm-hardened] | [root-sukisu-ultra-performance-kpm-hardened] |
+          | **Resukisu** | [root-resukisu-powersave-hardened] | [root-resukisu-balance-hardened] | [root-resukisu-performance-hardened] | [root-resukisu-ultra-performance-hardened] |
+          | **Resukisu + KPM** | [root-resukisu-powersave-kpm-hardened] | [root-resukisu-balance-kpm-hardened] | [root-resukisu-performance-kpm-hardened] | [root-resukisu-ultra-performance-kpm-hardened] |
+          | **Mambosu** | [root-mambosu-powersave-hardened] | [root-mambosu-balance-hardened] | [root-mambosu-performance-hardened] | [root-mambosu-ultra-performance-hardened] |
+
+          ### SUSFS ඞ + Hardened
+          | Variant | Powersave | Balance | Performance | Ultra-Performance |
+          |---|---|---|---|---|
+          | **KernelSU Next** | [susfs-ksu-next-powersave-hardened] | [susfs-ksu-next-balance-hardened] | [susfs-ksu-next-performance-hardened] | [susfs-ksu-next-ultra-performance-hardened] |
+          | **Sukisu** | [susfs-sukisu-powersave-hardened] | [susfs-sukisu-balance-hardened] | [susfs-sukisu-performance-hardened] | [susfs-sukisu-ultra-performance-hardened] |
+          | **Sukisu + KPM** | [susfs-sukisu-powersave-kpm-hardened] | [susfs-sukisu-balance-kpm-hardened] | [susfs-sukisu-performance-kpm-hardened] | [susfs-sukisu-ultra-performance-kpm-hardened] |
+          | **Resukisu** | [susfs-resukisu-powersave-hardened] | [susfs-resukisu-balance-hardened] | [susfs-resukisu-performance-hardened] | [susfs-resukisu-ultra-performance-hardened] |
+          | **Resukisu + KPM** | [susfs-resukisu-powersave-kpm-hardened] | [susfs-resukisu-balance-kpm-hardened] | [susfs-resukisu-performance-kpm-hardened] | [susfs-resukisu-ultra-performance-kpm-hardened] |
+          | **Mambosu** | [susfs-mambosu-powersave-hardened] | [susfs-mambosu-balance-hardened] | [susfs-mambosu-performance-hardened] | [susfs-mambosu-ultra-performance-hardened] |
+
+          [stock-powersave]: $BASE/Kono-Ha-stock-powersave.zip
+          [stock-balance]: $BASE/Kono-Ha-stock-balance.zip
+          [stock-performance]: $BASE/Kono-Ha-stock-performance.zip
+          [stock-ultra-performance]: $BASE/Kono-Ha-stock-ultra-performance.zip
+
+          [root-ksu-next-powersave]: $BASE/Kono-Ha-root-ksu-next-powersave.zip
+          [root-ksu-next-balance]: $BASE/Kono-Ha-root-ksu-next-balance.zip
+          [root-ksu-next-performance]: $BASE/Kono-Ha-root-ksu-next-performance.zip
+          [root-ksu-next-ultra-performance]: $BASE/Kono-Ha-root-ksu-next-ultra-performance.zip
+
+          [root-sukisu-powersave]: $BASE/Kono-Ha-root-sukisu-powersave.zip
+          [root-sukisu-balance]: $BASE/Kono-Ha-root-sukisu-balance.zip
+          [root-sukisu-performance]: $BASE/Kono-Ha-root-sukisu-performance.zip
+          [root-sukisu-ultra-performance]: $BASE/Kono-Ha-root-sukisu-ultra-performance.zip
+
+          [root-sukisu-powersave-kpm]: $BASE/Kono-Ha-root-sukisu-powersave-kpm.zip
+          [root-sukisu-balance-kpm]: $BASE/Kono-Ha-root-sukisu-balance-kpm.zip
+          [root-sukisu-performance-kpm]: $BASE/Kono-Ha-root-sukisu-performance-kpm.zip
+          [root-sukisu-ultra-performance-kpm]: $BASE/Kono-Ha-root-sukisu-ultra-performance-kpm.zip
+
+          [root-resukisu-powersave]: $BASE/Kono-Ha-root-resukisu-powersave.zip
+          [root-resukisu-balance]: $BASE/Kono-Ha-root-resukisu-balance.zip
+          [root-resukisu-performance]: $BASE/Kono-Ha-root-resukisu-performance.zip
+          [root-resukisu-ultra-performance]: $BASE/Kono-Ha-root-resukisu-ultra-performance.zip
+
+          [root-resukisu-powersave-kpm]: $BASE/Kono-Ha-root-resukisu-powersave-kpm.zip
+          [root-resukisu-balance-kpm]: $BASE/Kono-Ha-root-resukisu-balance-kpm.zip
+          [root-resukisu-performance-kpm]: $BASE/Kono-Ha-root-resukisu-performance-kpm.zip
+          [root-resukisu-ultra-performance-kpm]: $BASE/Kono-Ha-root-resukisu-ultra-performance-kpm.zip
+
+          [root-mambosu-powersave]: $BASE/Kono-Ha-root-mambosu-powersave.zip
+          [root-mambosu-balance]: $BASE/Kono-Ha-root-mambosu-balance.zip
+          [root-mambosu-performance]: $BASE/Kono-Ha-root-mambosu-performance.zip
+          [root-mambosu-ultra-performance]: $BASE/Kono-Ha-root-mambosu-ultra-performance.zip
+
+          [susfs-ksu-next-powersave]: $BASE/Kono-Ha-susfs-ksu-next-powersave.zip
+          [susfs-ksu-next-balance]: $BASE/Kono-Ha-susfs-ksu-next-balance.zip
+          [susfs-ksu-next-performance]: $BASE/Kono-Ha-susfs-ksu-next-performance.zip
+          [susfs-ksu-next-ultra-performance]: $BASE/Kono-Ha-susfs-ksu-next-ultra-performance.zip
+
+          [susfs-sukisu-powersave]: $BASE/Kono-Ha-susfs-sukisu-powersave.zip
+          [susfs-sukisu-balance]: $BASE/Kono-Ha-susfs-sukisu-balance.zip
+          [susfs-sukisu-performance]: $BASE/Kono-Ha-susfs-sukisu-performance.zip
+          [susfs-sukisu-ultra-performance]: $BASE/Kono-Ha-susfs-sukisu-ultra-performance.zip
+
+          [susfs-sukisu-powersave-kpm]: $BASE/Kono-Ha-susfs-sukisu-powersave-kpm.zip
+          [susfs-sukisu-balance-kpm]: $BASE/Kono-Ha-susfs-sukisu-balance-kpm.zip
+          [susfs-sukisu-performance-kpm]: $BASE/Kono-Ha-susfs-sukisu-performance-kpm.zip
+          [susfs-sukisu-ultra-performance-kpm]: $BASE/Kono-Ha-susfs-sukisu-ultra-performance-kpm.zip
+
+          [susfs-resukisu-powersave]: $BASE/Kono-Ha-susfs-resukisu-powersave.zip
+          [susfs-resukisu-balance]: $BASE/Kono-Ha-susfs-resukisu-balance.zip
+          [susfs-resukisu-performance]: $BASE/Kono-Ha-susfs-resukisu-performance.zip
+          [susfs-resukisu-ultra-performance]: $BASE/Kono-Ha-susfs-resukisu-ultra-performance.zip
+
+          [susfs-resukisu-powersave-kpm]: $BASE/Kono-Ha-susfs-resukisu-powersave-kpm.zip
+          [susfs-resukisu-balance-kpm]: $BASE/Kono-Ha-susfs-resukisu-balance-kpm.zip
+          [susfs-resukisu-performance-kpm]: $BASE/Kono-Ha-susfs-resukisu-performance-kpm.zip
+          [susfs-resukisu-ultra-performance-kpm]: $BASE/Kono-Ha-susfs-resukisu-ultra-performance-kpm.zip
+
+          [susfs-mambosu-powersave]: $BASE/Kono-Ha-susfs-mambosu-powersave.zip
+          [susfs-mambosu-balance]: $BASE/Kono-Ha-susfs-mambosu-balance.zip
+          [susfs-mambosu-performance]: $BASE/Kono-Ha-susfs-mambosu-performance.zip
+          [susfs-mambosu-ultra-performance]: $BASE/Kono-Ha-susfs-mambosu-ultra-performance.zip
+
+          [stock-powersave-hardened]: $BASE/Kono-Ha-stock-powersave-hardened.zip
+          [stock-balance-hardened]: $BASE/Kono-Ha-stock-balance-hardened.zip
+          [stock-performance-hardened]: $BASE/Kono-Ha-stock-performance-hardened.zip
+          [stock-ultra-performance-hardened]: $BASE/Kono-Ha-stock-ultra-performance-hardened.zip
+
+          [root-ksu-next-powersave-hardened]: $BASE/Kono-Ha-root-ksu-next-powersave-hardened.zip
+          [root-ksu-next-balance-hardened]: $BASE/Kono-Ha-root-ksu-next-balance-hardened.zip
+          [root-ksu-next-performance-hardened]: $BASE/Kono-Ha-root-ksu-next-performance-hardened.zip
+          [root-ksu-next-ultra-performance-hardened]: $BASE/Kono-Ha-root-ksu-next-ultra-performance-hardened.zip
+
+          [root-sukisu-powersave-hardened]: $BASE/Kono-Ha-root-sukisu-powersave-hardened.zip
+          [root-sukisu-balance-hardened]: $BASE/Kono-Ha-root-sukisu-balance-hardened.zip
+          [root-sukisu-performance-hardened]: $BASE/Kono-Ha-root-sukisu-performance-hardened.zip
+          [root-sukisu-ultra-performance-hardened]: $BASE/Kono-Ha-root-sukisu-ultra-performance-hardened.zip
+
+          [root-sukisu-powersave-kpm-hardened]: $BASE/Kono-Ha-root-sukisu-powersave-kpm-hardened.zip
+          [root-sukisu-balance-kpm-hardened]: $BASE/Kono-Ha-root-sukisu-balance-kpm-hardened.zip
+          [root-sukisu-performance-kpm-hardened]: $BASE/Kono-Ha-root-sukisu-performance-kpm-hardened.zip
+          [root-sukisu-ultra-performance-kpm-hardened]: $BASE/Kono-Ha-root-sukisu-ultra-performance-kpm-hardened.zip
+
+          [root-resukisu-powersave-hardened]: $BASE/Kono-Ha-root-resukisu-powersave-hardened.zip
+          [root-resukisu-balance-hardened]: $BASE/Kono-Ha-root-resukisu-balance-hardened.zip
+          [root-resukisu-performance-hardened]: $BASE/Kono-Ha-root-resukisu-performance-hardened.zip
+          [root-resukisu-ultra-performance-hardened]: $BASE/Kono-Ha-root-resukisu-ultra-performance-hardened.zip
+
+          [root-resukisu-powersave-kpm-hardened]: $BASE/Kono-Ha-root-resukisu-powersave-kpm-hardened.zip
+          [root-resukisu-balance-kpm-hardened]: $BASE/Kono-Ha-root-resukisu-balance-kpm-hardened.zip
+          [root-resukisu-performance-kpm-hardened]: $BASE/Kono-Ha-root-resukisu-performance-kpm-hardened.zip
+          [root-resukisu-ultra-performance-kpm-hardened]: $BASE/Kono-Ha-root-resukisu-ultra-performance-kpm-hardened.zip
+
+          [root-mambosu-powersave-hardened]: $BASE/Kono-Ha-root-mambosu-powersave-hardened.zip
+          [root-mambosu-balance-hardened]: $BASE/Kono-Ha-root-mambosu-balance-hardened.zip
+          [root-mambosu-performance-hardened]: $BASE/Kono-Ha-root-mambosu-performance-hardened.zip
+          [root-mambosu-ultra-performance-hardened]: $BASE/Kono-Ha-root-mambosu-ultra-performance-hardened.zip
+
+          [susfs-ksu-next-powersave-hardened]: $BASE/Kono-Ha-susfs-ksu-next-powersave-hardened.zip
+          [susfs-ksu-next-balance-hardened]: $BASE/Kono-Ha-susfs-ksu-next-balance-hardened.zip
+          [susfs-ksu-next-performance-hardened]: $BASE/Kono-Ha-susfs-ksu-next-performance-hardened.zip
+          [susfs-ksu-next-ultra-performance-hardened]: $BASE/Kono-Ha-susfs-ksu-next-ultra-performance-hardened.zip
+
+          [susfs-sukisu-powersave-hardened]: $BASE/Kono-Ha-susfs-sukisu-powersave-hardened.zip
+          [susfs-sukisu-balance-hardened]: $BASE/Kono-Ha-susfs-sukisu-balance-hardened.zip
+          [susfs-sukisu-performance-hardened]: $BASE/Kono-Ha-susfs-sukisu-performance-hardened.zip
+          [susfs-sukisu-ultra-performance-hardened]: $BASE/Kono-Ha-susfs-sukisu-ultra-performance-hardened.zip
+
+          [susfs-sukisu-powersave-kpm-hardened]: $BASE/Kono-Ha-susfs-sukisu-powersave-kpm-hardened.zip
+          [susfs-sukisu-balance-kpm-hardened]: $BASE/Kono-Ha-susfs-sukisu-balance-kpm-hardened.zip
+          [susfs-sukisu-performance-kpm-hardened]: $BASE/Kono-Ha-susfs-sukisu-performance-kpm-hardened.zip
+          [susfs-sukisu-ultra-performance-kpm-hardened]: $BASE/Kono-Ha-susfs-sukisu-ultra-performance-kpm-hardened.zip
+
+          [susfs-resukisu-powersave-hardened]: $BASE/Kono-Ha-susfs-resukisu-powersave-hardened.zip
+          [susfs-resukisu-balance-hardened]: $BASE/Kono-Ha-susfs-resukisu-balance-hardened.zip
+          [susfs-resukisu-performance-hardened]: $BASE/Kono-Ha-susfs-resukisu-performance-hardened.zip
+          [susfs-resukisu-ultra-performance-hardened]: $BASE/Kono-Ha-susfs-resukisu-ultra-performance-hardened.zip
+
+          [susfs-resukisu-powersave-kpm-hardened]: $BASE/Kono-Ha-susfs-resukisu-powersave-kpm-hardened.zip
+          [susfs-resukisu-balance-kpm-hardened]: $BASE/Kono-Ha-susfs-resukisu-balance-kpm-hardened.zip
+          [susfs-resukisu-performance-kpm-hardened]: $BASE/Kono-Ha-susfs-resukisu-performance-kpm-hardened.zip
+          [susfs-resukisu-ultra-performance-kpm-hardened]: $BASE/Kono-Ha-susfs-resukisu-ultra-performance-kpm-hardened.zip
+
+          [susfs-mambosu-powersave-hardened]: $BASE/Kono-Ha-susfs-mambosu-powersave-hardened.zip
+          [susfs-mambosu-balance-hardened]: $BASE/Kono-Ha-susfs-mambosu-balance-hardened.zip
+          [susfs-mambosu-performance-hardened]: $BASE/Kono-Ha-susfs-mambosu-performance-hardened.zip
+          [susfs-mambosu-ultra-performance-hardened]: $BASE/Kono-Ha-susfs-mambosu-ultra-performance-hardened.zip
+          EOF
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}-${{ github.sha }}
           name: Build ${{ github.sha }}
-          body: |
-            Automated kernel build.
-            Commit: ${{ github.sha }}
-            Ref: ${{ github.ref }}
-
-            ### Standard / Root Builds
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **Stock** | `stock-powersave` | `stock-balance` | `stock-performance` | `stock-ultra-performance` |
-            | **KernelSU Next** | `root-ksu-next-powersave` | `root-ksu-next-balance` | `root-ksu-next-performance` | `root-ksu-next-ultra-performance` |
-            | **Sukisu** | `root-sukisu-powersave` | `root-sukisu-balance` | `root-sukisu-performance` | `root-sukisu-ultra-performance` |
-            | **Sukisu + KPM** | `root-sukisu-powersave-kpm` | `root-sukisu-balance-kpm` | `root-sukisu-performance-kpm` | `root-sukisu-ultra-performance-kpm` |
-            | **Resukisu** | `root-resukisu-powersave` | `root-resukisu-balance` | `root-resukisu-performance` | `root-resukisu-ultra-performance` |
-            | **Resukisu + KPM** | `root-resukisu-powersave-kpm` | `root-resukisu-balance-kpm` | `root-resukisu-performance-kpm` | `root-resukisu-ultra-performance-kpm` |
-            | **Mambosu** | `root-mambosu-powersave` | `root-mambosu-balance` | `root-mambosu-performance` | `root-mambosu-ultra-performance` |
-
-            ### SUSFS ඞ
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **KernelSU Next** | `susfs-ksu-next-powersave` | `susfs-ksu-next-balance` | `susfs-ksu-next-performance` | `susfs-ksu-next-ultra-performance` |
-            | **Sukisu** | `susfs-sukisu-powersave` | `susfs-sukisu-balance` | `susfs-sukisu-performance` | `susfs-sukisu-ultra-performance` |
-            | **Sukisu + KPM** | `susfs-sukisu-powersave-kpm` | `susfs-sukisu-balance-kpm` | `susfs-sukisu-performance-kpm` | `susfs-sukisu-ultra-performance-kpm` |
-            | **Resukisu** | `susfs-resukisu-powersave` | `susfs-resukisu-balance` | `susfs-resukisu-performance` | `susfs-resukisu-ultra-performance` |
-            | **Resukisu + KPM** | `susfs-resukisu-powersave-kpm` | `susfs-resukisu-balance-kpm` | `susfs-resukisu-performance-kpm` | `susfs-resukisu-ultra-performance-kpm` |
-            | **Mambosu** | `susfs-mambosu-powersave` | `susfs-mambosu-balance` | `susfs-mambosu-performance` | `susfs-mambosu-ultra-performance` |
-
-            ### Hardened
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **Stock** | `stock-powersave-hardened` | `stock-balance-hardened` | `stock-performance-hardened` | `stock-ultra-performance-hardened` |
-            | **KernelSU Next** | `root-ksu-next-powersave-hardened` | `root-ksu-next-balance-hardened` | `root-ksu-next-performance-hardened` | `root-ksu-next-ultra-performance-hardened` |
-            | **Sukisu** | `root-sukisu-powersave-hardened` | `root-sukisu-balance-hardened` | `root-sukisu-performance-hardened` | `root-sukisu-ultra-performance-hardened` |
-            | **Sukisu + KPM** | `root-sukisu-powersave-kpm-hardened` | `root-sukisu-balance-kpm-hardened` | `root-sukisu-performance-kpm-hardened` | `root-sukisu-ultra-performance-kpm-hardened` |
-            | **Resukisu** | `root-resukisu-powersave-hardened` | `root-resukisu-balance-hardened` | `root-resukisu-performance-hardened` | `root-resukisu-ultra-performance-hardened` |
-            | **Resukisu + KPM** | `root-resukisu-powersave-kpm-hardened` | `root-resukisu-balance-kpm-hardened` | `root-resukisu-performance-kpm-hardened` | `root-resukisu-ultra-performance-kpm-hardened` |
-            | **Mambosu** | `root-mambosu-powersave-hardened` | `root-mambosu-balance-hardened` | `root-mambosu-performance-hardened` | `root-mambosu-ultra-performance-hardened` |
-
-            ### SUSFS ඞ + Hardened
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **KernelSU Next** | `susfs-ksu-next-powersave-hardened` | `susfs-ksu-next-balance-hardened` | `susfs-ksu-next-performance-hardened` | `susfs-ksu-next-ultra-performance-hardened` |
-            | **Sukisu** | `susfs-sukisu-powersave-hardened` | `susfs-sukisu-balance-hardened` | `susfs-sukisu-performance-hardened` | `susfs-sukisu-ultra-performance-hardened` |
-            | **Sukisu + KPM** | `susfs-sukisu-powersave-kpm-hardened` | `susfs-sukisu-balance-kpm-hardened` | `susfs-sukisu-performance-kpm-hardened` | `susfs-sukisu-ultra-performance-kpm-hardened` |
-            | **Resukisu** | `susfs-resukisu-powersave-hardened` | `susfs-resukisu-balance-hardened` | `susfs-resukisu-performance-hardened` | `susfs-resukisu-ultra-performance-hardened` |
-            | **Resukisu + KPM** | `susfs-resukisu-powersave-kpm-hardened` | `susfs-resukisu-balance-kpm-hardened` | `susfs-resukisu-performance-kpm-hardened` | `susfs-resukisu-ultra-performance-kpm-hardened` |
-            | **Mambosu** | `susfs-mambosu-powersave-hardened` | `susfs-mambosu-balance-hardened` | `susfs-mambosu-performance-hardened` | `susfs-mambosu-ultra-performance-hardened` |
+          body_path: release_body.md
           files: release_assets/*
