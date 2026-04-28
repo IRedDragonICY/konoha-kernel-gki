@@ -199,7 +199,14 @@ rebuild_sucompat_h() {
         grep -q "ksu_handle_execveat_sucompat" "$SUCOMPAT_C" 2>/dev/null && has_execveat_sucompat=1
     fi
 
-    cat > "$SUCOMPAT_H" << 'SUCOMPAT_H_EOF'
+    # Detect if sucompat.c uses DEFINE_STATIC_KEY_TRUE or plain bool
+    local use_static_key=0
+    if [ -f "$SUCOMPAT_C" ]; then
+        grep -q 'DEFINE_STATIC_KEY_TRUE(ksu_su_compat_enabled)' "$SUCOMPAT_C" 2>/dev/null && use_static_key=1
+    fi
+
+    if [ "$use_static_key" -eq 1 ]; then
+        cat > "$SUCOMPAT_H" << 'SUCOMPAT_H_EOF'
 #ifndef __KSU_H_SUCOMPAT
 #define __KSU_H_SUCOMPAT
 #include <asm/ptrace.h>
@@ -220,6 +227,28 @@ int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
 int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
 #endif
 SUCOMPAT_H_EOF
+    else
+        cat > "$SUCOMPAT_H" << 'SUCOMPAT_H_EOF'
+#ifndef __KSU_H_SUCOMPAT
+#define __KSU_H_SUCOMPAT
+#include <asm/ptrace.h>
+#include <linux/types.h>
+#include <linux/version.h>
+
+extern bool ksu_su_compat_enabled;
+
+void ksu_sucompat_init(void);
+void ksu_sucompat_exit(void);
+
+int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *__unused_flags);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
+#else
+int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+#endif
+SUCOMPAT_H_EOF
+    fi
 
     # Add the correct execve function declarations
     if [ "$has_execve_sucompat" -eq 1 ]; then
