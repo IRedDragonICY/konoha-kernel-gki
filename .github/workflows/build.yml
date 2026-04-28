@@ -103,6 +103,7 @@ jobs:
           name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}
           path: gki-clo/Kono-Ha-Release
           retention-days: 7
+
   release:
     needs: build-kernel
     runs-on: ubuntu-24.04
@@ -121,55 +122,109 @@ jobs:
           find artifacts -type f -name "*.zip" -exec mv {} release_assets/ \; || true
           find artifacts -type f -name "*.img" -exec mv {} release_assets/ \; || true
 
+      - name: Generate Release Body
+        run: |
+          python3 -c "
+          import os
+          
+          repo = os.environ['GITHUB_REPOSITORY']
+          run_num = os.environ['GITHUB_RUN_NUMBER']
+          sha = os.environ['GITHUB_SHA']
+          base_url = f'https://github.com/{repo}/releases/download/build-{run_num}-{sha}'
+          
+          try:
+              zips = [f for f in os.listdir('release_assets') if f.endswith('.zip')]
+          except FileNotFoundError:
+              zips = []
+              
+          def get_link(variant, root, hz, kpm, hardened):
+              for f in zips:
+                  fl = f.lower()
+                  if variant not in fl: continue
+                  
+                  if root == 'ksu-next' and 'next' not in fl: continue
+                  if root == 'sukisu' and ('sukisu' not in fl or 'resukisu' in fl): continue
+                  if root == 'resukisu' and 'resukisu' not in fl: continue
+                  if root == 'mambosu' and 'mambosu' not in fl: continue
+                  if root == 'none' and any(x in fl for x in ['next', 'sukisu', 'resukisu', 'mambosu']): continue
+                  
+                  if hz == 'ultra-performance' and 'ultra' not in fl: continue
+                  if hz == 'performance' and ('performance' not in fl or 'ultra' in fl): continue
+                  if hz == 'powersave' and 'powersave' not in fl: continue
+                  if hz == 'balance' and 'balance' not in fl: continue
+                  
+                  if kpm and '-kpm' not in fl: continue
+                  if not kpm and '-kpm' in fl: continue
+                  
+                  if hardened and '-hardened' not in fl: continue
+                  if not hardened and '-hardened' in fl: continue
+                  
+                  label = '-'.join(filter(None, [
+                      variant,
+                      root if root != 'none' else '',
+                      hz,
+                      'kpm' if kpm else '',
+                      'hardened' if hardened else ''
+                  ]))
+                  return f'[{label}]({base_url}/{f})'
+              return '-'
+              
+          def gen_table(title, rows):
+              out = [f'### {title}', '| Variant | Powersave | Balance | Performance | Ultra-Performance |', '|---|---|---|---|---|']
+              for r_title, v, r, k, h in rows:
+                  cols = [get_link(v, r, hz, k, h) for hz in ['powersave', 'balance', 'performance', 'ultra-performance']]
+                  if any(c != '-' for c in cols):
+                      out.append(f'| **{r_title}** | ' + ' | '.join(cols) + ' |')
+              return '\n'.join(out) + '\n\n'
+              
+          std = [
+              ('Stock', 'stock', 'none', False, False),
+              ('KernelSU Next', 'root', 'ksu-next', False, False),
+              ('Sukisu', 'root', 'sukisu', False, False),
+              ('Sukisu + KPM', 'root', 'sukisu', True, False),
+              ('Resukisu', 'root', 'resukisu', False, False),
+              ('Resukisu + KPM', 'root', 'resukisu', True, False),
+              ('Mambosu', 'root', 'mambosu', False, False),
+          ]
+          susfs = [
+              ('KernelSU Next', 'susfs', 'ksu-next', False, False),
+              ('Sukisu', 'susfs', 'sukisu', False, False),
+              ('Sukisu + KPM', 'susfs', 'sukisu', True, False),
+              ('Resukisu', 'susfs', 'resukisu', False, False),
+              ('Resukisu + KPM', 'susfs', 'resukisu', True, False),
+              ('Mambosu', 'susfs', 'mambosu', False, False),
+          ]
+          hard = [
+              ('Stock', 'stock', 'none', False, True),
+              ('KernelSU Next', 'root', 'ksu-next', False, True),
+              ('Sukisu', 'root', 'sukisu', False, True),
+              ('Sukisu + KPM', 'root', 'sukisu', True, True),
+              ('Resukisu', 'root', 'resukisu', False, True),
+              ('Resukisu + KPM', 'root', 'resukisu', True, True),
+              ('Mambosu', 'root', 'mambosu', False, True),
+          ]
+          susfs_hard = [
+              ('KernelSU Next', 'susfs', 'ksu-next', False, True),
+              ('Sukisu', 'susfs', 'sukisu', False, True),
+              ('Sukisu + KPM', 'susfs', 'sukisu', True, True),
+              ('Resukisu', 'susfs', 'resukisu', False, True),
+              ('Resukisu + KPM', 'susfs', 'resukisu', True, True),
+              ('Mambosu', 'susfs', 'mambosu', False, True),
+          ]
+          
+          with open('release_body.md', 'w') as f:
+              f.write('Automated kernel build.\n')
+              f.write(f'Commit: {sha}\n\n')
+              f.write(gen_table('Standard / Root Builds', std))
+              f.write(gen_table('SUSFS ඞ', susfs))
+              f.write(gen_table('Hardened', hard))
+              f.write(gen_table('SUSFS ඞ + Hardened', susfs_hard))
+          "
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}-${{ github.sha }}
           name: Build ${{ github.sha }}
-          body: |
-            Automated kernel build.
-            Commit: ${{ github.sha }}
-            Ref: ${{ github.ref }}
-
-            ### Standard / Root Builds
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **Stock** | `stock-powersave` | `stock-balance` | `stock-performance` | `stock-ultra-performance` |
-            | **KernelSU Next** | `root-ksu-next-powersave` | `root-ksu-next-balance` | `root-ksu-next-performance` | `root-ksu-next-ultra-performance` |
-            | **Sukisu** | `root-sukisu-powersave` | `root-sukisu-balance` | `root-sukisu-performance` | `root-sukisu-ultra-performance` |
-            | **Sukisu + KPM** | `root-sukisu-powersave-kpm` | `root-sukisu-balance-kpm` | `root-sukisu-performance-kpm` | `root-sukisu-ultra-performance-kpm` |
-            | **Resukisu** | `root-resukisu-powersave` | `root-resukisu-balance` | `root-resukisu-performance` | `root-resukisu-ultra-performance` |
-            | **Resukisu + KPM** | `root-resukisu-powersave-kpm` | `root-resukisu-balance-kpm` | `root-resukisu-performance-kpm` | `root-resukisu-ultra-performance-kpm` |
-            | **Mambosu** | `root-mambosu-powersave` | `root-mambosu-balance` | `root-mambosu-performance` | `root-mambosu-ultra-performance` |
-
-            ### SUSFS ඞ
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **KernelSU Next** | `susfs-ksu-next-powersave` | `susfs-ksu-next-balance` | `susfs-ksu-next-performance` | `susfs-ksu-next-ultra-performance` |
-            | **Sukisu** | `susfs-sukisu-powersave` | `susfs-sukisu-balance` | `susfs-sukisu-performance` | `susfs-sukisu-ultra-performance` |
-            | **Sukisu + KPM** | `susfs-sukisu-powersave-kpm` | `susfs-sukisu-balance-kpm` | `susfs-sukisu-performance-kpm` | `susfs-sukisu-ultra-performance-kpm` |
-            | **Resukisu** | `susfs-resukisu-powersave` | `susfs-resukisu-balance` | `susfs-resukisu-performance` | `susfs-resukisu-ultra-performance` |
-            | **Resukisu + KPM** | `susfs-resukisu-powersave-kpm` | `susfs-resukisu-balance-kpm` | `susfs-resukisu-performance-kpm` | `susfs-resukisu-ultra-performance-kpm` |
-            | **Mambosu** | `susfs-mambosu-powersave` | `susfs-mambosu-balance` | `susfs-mambosu-performance` | `susfs-mambosu-ultra-performance` |
-
-            ### Hardened
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **Stock** | `stock-powersave-hardened` | `stock-balance-hardened` | `stock-performance-hardened` | `stock-ultra-performance-hardened` |
-            | **KernelSU Next** | `root-ksu-next-powersave-hardened` | `root-ksu-next-balance-hardened` | `root-ksu-next-performance-hardened` | `root-ksu-next-ultra-performance-hardened` |
-            | **Sukisu** | `root-sukisu-powersave-hardened` | `root-sukisu-balance-hardened` | `root-sukisu-performance-hardened` | `root-sukisu-ultra-performance-hardened` |
-            | **Sukisu + KPM** | `root-sukisu-powersave-kpm-hardened` | `root-sukisu-balance-kpm-hardened` | `root-sukisu-performance-kpm-hardened` | `root-sukisu-ultra-performance-kpm-hardened` |
-            | **Resukisu** | `root-resukisu-powersave-hardened` | `root-resukisu-balance-hardened` | `root-resukisu-performance-hardened` | `root-resukisu-ultra-performance-hardened` |
-            | **Resukisu + KPM** | `root-resukisu-powersave-kpm-hardened` | `root-resukisu-balance-kpm-hardened` | `root-resukisu-performance-kpm-hardened` | `root-resukisu-ultra-performance-kpm-hardened` |
-            | **Mambosu** | `root-mambosu-powersave-hardened` | `root-mambosu-balance-hardened` | `root-mambosu-performance-hardened` | `root-mambosu-ultra-performance-hardened` |
-
-            ### SUSFS ඞ + Hardened
-            | Variant | Powersave | Balance | Performance | Ultra-Performance |
-            |---|---|---|---|---|
-            | **KernelSU Next** | `susfs-ksu-next-powersave-hardened` | `susfs-ksu-next-balance-hardened` | `susfs-ksu-next-performance-hardened` | `susfs-ksu-next-ultra-performance-hardened` |
-            | **Sukisu** | `susfs-sukisu-powersave-hardened` | `susfs-sukisu-balance-hardened` | `susfs-sukisu-performance-hardened` | `susfs-sukisu-ultra-performance-hardened` |
-            | **Sukisu + KPM** | `susfs-sukisu-powersave-kpm-hardened` | `susfs-sukisu-balance-kpm-hardened` | `susfs-sukisu-performance-kpm-hardened` | `susfs-sukisu-ultra-performance-kpm-hardened` |
-            | **Resukisu** | `susfs-resukisu-powersave-hardened` | `susfs-resukisu-balance-hardened` | `susfs-resukisu-performance-hardened` | `susfs-resukisu-ultra-performance-hardened` |
-            | **Resukisu + KPM** | `susfs-resukisu-powersave-kpm-hardened` | `susfs-resukisu-balance-kpm-hardened` | `susfs-resukisu-performance-kpm-hardened` | `susfs-resukisu-ultra-performance-kpm-hardened` |
-            | **Mambosu** | `susfs-mambosu-powersave-hardened` | `susfs-mambosu-balance-hardened` | `susfs-mambosu-performance-hardened` | `susfs-mambosu-ultra-performance-hardened` |
+          body_path: release_body.md
           files: release_assets/*

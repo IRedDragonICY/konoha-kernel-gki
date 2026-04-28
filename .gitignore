@@ -183,3 +183,6 @@ drivers/kernelsu
 fs/susfs.c
 include/linux/susfs.h
 include/linux/susfs_def.h
+/mca_modules/
+/vendor_blobs/
+
