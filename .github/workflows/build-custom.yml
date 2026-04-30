@@ -49,6 +49,14 @@ on:
           - 'off'
           - 'on'
         default: 'off'
+      bypasscharging:
+        description: "Bypass Charging (MCA Override)"
+        required: true
+        type: choice
+        options:
+          - "off"
+          - "on"
+        default: "off"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -67,6 +75,7 @@ jobs:
           INPUT_ROOT: ${{ inputs.root }}
           INPUT_KPM: ${{ inputs.kpm }}
           INPUT_HARDENED: ${{ inputs.hardened }}
+          INPUT_BYPASS: ${{ inputs.bypasscharging }}
         run: |
           if [ "$INPUT_HZ" == "powersave" ]; then HZ_ID=100
           elif [ "$INPUT_HZ" == "balance" ]; then HZ_ID=250
@@ -89,6 +98,7 @@ jobs:
           
           if [ "$INPUT_KPM" == "on" ]; then BUILD_NAME="${BUILD_NAME}-kpm"; fi
           if [ "$INPUT_HARDENED" == "on" ]; then BUILD_NAME="${BUILD_NAME}-hardened"; fi
+          if [ "$INPUT_BYPASS" == "on" ]; then BUILD_NAME="${BUILD_NAME}-bypasscharging"; fi
           
           echo "BUILD_NAME=$BUILD_NAME" >> $GITHUB_ENV
           
@@ -132,6 +142,7 @@ jobs:
           INPUT_VARIANT: ${{ inputs.variant }}
           INPUT_KPM: ${{ inputs.kpm }}
           INPUT_HARDENED: ${{ inputs.hardened }}
+          INPUT_BYPASS: ${{ inputs.bypasscharging }}
         run: |
           cd gki-clo
           chmod +x build.sh
@@ -159,6 +170,7 @@ jobs:
             kpm_superkey="$KPM_KEY" \
             kpm_patch="$KPM_PATCH" \
             hardened="$INPUT_HARDENED" \
+            bypasscharging="$INPUT_BYPASS" \
             lto="$LTO_VAL"
 
       - name: Upload Artifact
@@ -198,6 +210,7 @@ jobs:
             Root: **${{ inputs.root }}**
             KPM: **${{ inputs.kpm }}**
             Hardened: **${{ inputs.hardened }}**
+            Bypass Charging: **${{ inputs.bypasscharging }}**
             
             Commit: ${{ github.sha }}
             Ref: ${{ github.ref }}

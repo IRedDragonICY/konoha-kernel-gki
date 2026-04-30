@@ -10,7 +10,7 @@ env:
 
 jobs:
   build-kernel:
-    name: "${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}"
+    name: "${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}${{ matrix.bypasscharging == 'on' && '-bypasscharging' || '' }}"
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -23,6 +23,7 @@ jobs:
         root: [none, ksu-next, sukisu, resukisu, mambosu]
         kpm: [off, on]
         hardened: [off, on]
+        bypasscharging: [off, on]
         exclude:
           - variant: stock
             root: ksu-next
@@ -95,12 +96,13 @@ jobs:
             kpm_superkey=${{ matrix.kpm == 'on' && secrets.KPM_SUPERKEY || '' }} \
             kpm_patch=${{ matrix.kpm == 'on' && matrix.root == 'resukisu' && 'off' || 'on' }} \
             hardened=${{ matrix.hardened }} \
+            bypasscharging=${{ matrix.bypasscharging }} \
             lto=${{ matrix.kpm == 'on' && 'thin' || 'full' }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}
+          name: Kono-Ha-${{ matrix.variant == 'stock' && format('{0}-{1}', matrix.variant, matrix.hz.name) || format('{0}-{1}-{2}', matrix.variant, matrix.root, matrix.hz.name) }}${{ matrix.kpm == 'on' && '-kpm' || '' }}${{ matrix.hardened == 'on' && '-hardened' || '' }}${{ matrix.bypasscharging == 'on' && '-bypasscharging' || '' }}
           path: gki-clo/Kono-Ha-Release
           retention-days: 7
 
@@ -137,7 +139,7 @@ jobs:
           except FileNotFoundError:
               zips = []
               
-          def get_link(variant, root, hz, kpm, hardened):
+          def get_link(variant, root, hz, kpm, hardened, bypass):
               for f in zips:
                   fl = f.lower()
                   if variant not in fl: continue
@@ -159,23 +161,19 @@ jobs:
                   if hardened and '-hardened' not in fl: continue
                   if not hardened and '-hardened' in fl: continue
                   
-                  label = '-'.join(filter(None, [
-                      variant,
-                      root if root != 'none' else '',
-                      hz,
-                      'kpm' if kpm else '',
-                      'hardened' if hardened else ''
-                  ]))
+                  if bypass and '-bypasscharging' not in fl: continue
+                  if not bypass and '-bypasscharging' in fl: continue
+                  
+                  label = '-'.join(filter(None, [variant, root if root != 'none' else '', hz, 'kpm' if kpm else '', 'hardened' if hardened else '', 'bypass' if bypass else '']))
                   return f'[{label}]({base_url}/{f})'
               return '-'
               
-          def gen_table(title, rows):
+          def gen_table(title, rows, is_bypass):
               out = [f'### {title}', '| Variant | Powersave | Balance | Performance | Ultra-Performance |', '|---|---|---|---|---|']
               for r_title, v, r, k, h in rows:
-                  cols = [get_link(v, r, hz, k, h) for hz in ['powersave', 'balance', 'performance', 'ultra-performance']]
-                  if any(c != '-' for c in cols):
-                      out.append(f'| **{r_title}** | ' + ' | '.join(cols) + ' |')
-              return '\n'.join(out) + '\n\n'
+                  cols = [get_link(v, r, hz, k, h, is_bypass) for hz in ['powersave', 'balance', 'performance', 'ultra-performance']]
+                  if any(c != '-' for c in cols): out.append(f'| **{r_title}** | ' + ' | '.join(cols) + ' |')
+              return '\n'.join(out) + '\n\n' if len(out) > 3 else ''
               
           std = [
               ('Stock', 'stock', 'none', False, False),
@@ -215,10 +213,16 @@ jobs:
           with open('release_body.md', 'w') as f:
               f.write('Automated kernel build.\n')
               f.write(f'Commit: {sha}\n\n')
-              f.write(gen_table('Standard / Root Builds', std))
-              f.write(gen_table('SUSFS ඞ', susfs))
-              f.write(gen_table('Hardened', hard))
-              f.write(gen_table('SUSFS ඞ + Hardened', susfs_hard))
+              f.write(gen_table('Standard / Root Builds', std, False))
+              f.write(gen_table('SUSFS ඞ', susfs, False))
+              f.write(gen_table('Hardened', hard, False))
+              f.write(gen_table('SUSFS ඞ + Hardened', susfs_hard, False))
+              
+              f.write("---\n\n## ⚡ Bypass Charging Variants (MCA Override)\n\n")
+              f.write(gen_table('Standard / Root Builds ⚡', std, True))
+              f.write(gen_table('SUSFS ඞ ⚡', susfs, True))
+              f.write(gen_table('Hardened ⚡', hard, True))
+              f.write(gen_table('SUSFS ඞ + Hardened ⚡', susfs_hard, True))
           "
 
       - name: Create Release

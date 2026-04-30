@@ -29,6 +29,7 @@ for arg in "$@"; do
         kpm_patch=*) KPM_PATCH="${arg#*=}" ;;
         lto=*)      LTO_TYPE="${arg#*=}" ;;
         autofdo=*)  AUTOFDO="${arg#*=}" ;;
+        bypasscharging=*) BYPASSCHARGING="${arg#*=}" ;;
     esac
 done
 
@@ -146,6 +147,17 @@ if [ "$KPM" == "on" ] && [ "$LTO_TYPE" == "full" ]; then
     echo "[!] KPM with FULL LTO is unstable, forcing LTO=thin"
     LTO_TYPE="thin"
 fi
+# 7. Bypass Charging
+if [ -z "$BYPASSCHARGING" ]; then
+    echo "=========================================="
+    echo "         Bypass Charging (MCA)            "
+    echo "=========================================="
+    echo " 1) OFF (default - standard charging)"
+    echo " 2) ON  (Override limits / Bypass charging)"
+    read -p "Enter choice [1-2] (default 1): " _c
+    [ "${_c:-1}" == "2" ] && BYPASSCHARGING="on" || BYPASSCHARGING="off"
+fi
+
 
 # ==========================================
 # Resolve Root Solution
@@ -166,6 +178,7 @@ echo "          Build Configuration             "
 echo "=========================================="
 echo " Timer:     ${HZ} HZ"
 echo " Hardened:  ${HARDENED^^}"
+echo " Bypass:    ${BYPASSCHARGING^^}"
 [ "$VARIANT" != "stock" ] && echo " Variant:   ${VARIANT} ($REPO_NAME)" || echo " Variant:   stock"
 echo " LTO:       ${LTO_TYPE^^}"
 if [ "$VARIANT" != "stock" ]; then
@@ -387,6 +400,12 @@ EXTREME_CLANG_FLAGS=(
     # -mllvm -polly-process-unprofitable
 )
 KERNEL_KCFLAGS="-w ${EXTREME_CLANG_FLAGS[*]}"
+
+# Inject Bypass Charging Macro
+if [ "$BYPASSCHARGING" == "on" ]; then
+    KERNEL_KCFLAGS="$KERNEL_KCFLAGS -DCONFIG_MCA_BYPASS=1"
+fi
+
 KERNEL_LDFLAGS="-O2 --icf=all -mllvm -enable-new-pm=1"
 
 if ! check_clang; then
@@ -565,6 +584,7 @@ fi
 
 [ "$KPM" == "on" ] && ZIP_SUFFIX="${ZIP_SUFFIX}-kpm"
 [ "$HARDENED" == "on" ] && ZIP_SUFFIX="${ZIP_SUFFIX}-hardened"
+[ "$BYPASSCHARGING" == "on" ] && ZIP_SUFFIX="${ZIP_SUFFIX}-bypasscharging"
 
 HZ_LABEL=""
 case "$HZ" in 100) HZ_LABEL="-powersave" ;; 500) HZ_LABEL="-performance" ;; 1000) HZ_LABEL="-ultra-performance" ;; *) HZ_LABEL="-balance" ;; esac
