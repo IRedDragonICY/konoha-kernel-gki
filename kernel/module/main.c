@@ -2592,20 +2592,27 @@ static int pre_mca_vote(struct kprobe *p, struct pt_regs *regs)
 		}
 	}
 
-	if (state == 1 && client && (unsigned long)client > 0x1000) {
+	if (state == 1 && client && (unsigned long)client > 0x1000 && voter_name[0] != '\0') {
 		if (strcmp(client, "mca_thermal") == 0 ||
 			strcmp(client, "wire_chg_type") == 0 ||
 			strcmp(client, "icl_limit") == 0 ||
 			strcmp(client, "jeita") == 0 ||
 			strcmp(client, "usbicl") == 0 ||
 			strcmp(client, "sdpicl") == 0) {
-			if (val >= 50 && val < 5000)
-				regs->regs[3] = 5000;
+			/* ONLY override Input Current Limits to prevent battery overcharging */
+			if (strstr(voter_name, "ICL") || strstr(voter_name, "icl")) {
+				if (val >= 50 && val < 5000)
+					regs->regs[3] = 5000;
+			}
 		}
 		else if (strcmp(client, "volt_thermal_limit") == 0 ||
 			 strcmp(client, "volt_limit") == 0) {
-			if (val > 0 && val < 11000)
-				regs->regs[3] = 11000;
+			/* ONLY override Input Voltage Limits */
+			if (strstr(voter_name, "VBUS") || strstr(voter_name, "vbus") ||
+			    strstr(voter_name, "VIN") || strstr(voter_name, "vin")) {
+				if (val > 0 && val < 11000)
+					regs->regs[3] = 11000;
+			}
 		}
 	}
 
@@ -2625,8 +2632,11 @@ struct mca_patch_profile {
 	const char *device_name;
 	/* mca_smart_charge offsets */
 	u32 sc_game_turbo;
+	u32 sc_game_turbo_insn;
 	u32 sc_smart_night;
+	u32 sc_smart_night_insn;
 	u32 sc_bypass_timeout;
+	u32 sc_bypass_timeout_insn;
 	/* mca_strategy_fg_comp offsets */
 	u32 fg_comp_low;
 	u32 fg_comp_high;
@@ -2634,9 +2644,12 @@ struct mca_patch_profile {
 	u32 qc_soc_exit;
 	u32 qc_reg_limit;
 	u32 qc_cp_alive;
+	u32 qc_cp_alive_insn;
 	/* mca_strategy_buckchg offsets */
 	u32 bc_stepper;
+	u32 bc_stepper_insn;
 	u32 bc_suspend;
+	u32 bc_suspend_insn;
 };
 
 static const struct mca_patch_profile mca_profiles[] = {
@@ -2644,15 +2657,41 @@ static const struct mca_patch_profile mca_profiles[] = {
 		.scm_version = "gec8b9cedb7ab",
 		.device_name = "POCO F7 (Stock Firmware)",
 		.sc_game_turbo = 0x2114,
+		.sc_game_turbo_insn = 0x14000051,
 		.sc_smart_night = 0x24cc,
+		.sc_smart_night_insn = 0x1400001b,
 		.sc_bypass_timeout = 0x086c,
+		.sc_bypass_timeout_insn = 0x1400001a,
 		.fg_comp_low = 0x1708,
 		.fg_comp_high = 0x1f78,
 		.qc_soc_exit = 0x2db4,
 		.qc_reg_limit = 0x7424,
 		.qc_cp_alive = 0x4f64,
+		.qc_cp_alive_insn = 0x14000053,
 		.bc_stepper = 0x6348,
+		.bc_stepper_insn = 0x14000008,
 		.bc_suspend = 0x4a48,
+		.bc_suspend_insn = 0x14000003,
+	},
+	{
+		.scm_version = "g3b0531086a90",
+		.device_name = "POCO F7 Ultra (Stock Firmware)",
+		.sc_game_turbo = 0x2230,
+		.sc_game_turbo_insn = 0x14000009,
+		.sc_smart_night = 0x25f4,
+		.sc_smart_night_insn = 0x14000025,
+		.sc_bypass_timeout = 0x0894,
+		.sc_bypass_timeout_insn = 0x1400001a,
+		.fg_comp_low = 0x1628,
+		.fg_comp_high = 0x1f78,
+		.qc_soc_exit = 0x2ca8,
+		.qc_reg_limit = 0x71c4,
+		.qc_cp_alive = 0x4d14,
+		.qc_cp_alive_insn = 0x14000051,
+		.bc_stepper = 0x61ac,
+		.bc_stepper_insn = 0x14000008,
+		.bc_suspend = 0x48e8,
+		.bc_suspend_insn = 0x14000003,
 	},
 	/* You can append new device/update profiles here in the future */
 };
@@ -2705,11 +2744,11 @@ static void mca_live_patch(struct module *mod)
 
 	if (strcmp(mod->name, "mca_smart_charge") == 0) {
 		if (prof->sc_game_turbo)
-			aarch64_insn_patch_text_nosync(text + prof->sc_game_turbo, 0x14000051);
+			aarch64_insn_patch_text_nosync(text + prof->sc_game_turbo, prof->sc_game_turbo_insn);
 		if (prof->sc_smart_night)
-			aarch64_insn_patch_text_nosync(text + prof->sc_smart_night, 0x1400001b);
+			aarch64_insn_patch_text_nosync(text + prof->sc_smart_night, prof->sc_smart_night_insn);
 		if (prof->sc_bypass_timeout)
-			aarch64_insn_patch_text_nosync(text + prof->sc_bypass_timeout, 0x1400001a);
+			aarch64_insn_patch_text_nosync(text + prof->sc_bypass_timeout, prof->sc_bypass_timeout_insn);
 	}
 	else if (strcmp(mod->name, "mca_strategy_fg_comp") == 0) {
 		if (prof->fg_comp_low)
@@ -2723,13 +2762,13 @@ static void mca_live_patch(struct module *mod)
 		if (prof->qc_reg_limit)
 			aarch64_insn_patch_text_nosync(text + prof->qc_reg_limit, 0xd503201f);
 		if (prof->qc_cp_alive)
-			aarch64_insn_patch_text_nosync(text + prof->qc_cp_alive, 0x14000053);
+			aarch64_insn_patch_text_nosync(text + prof->qc_cp_alive, prof->qc_cp_alive_insn);
 	}
 	else if (strcmp(mod->name, "mca_strategy_buckchg") == 0) {
 		if (prof->bc_stepper)
-			aarch64_insn_patch_text_nosync(text + prof->bc_stepper, 0x14000008);
+			aarch64_insn_patch_text_nosync(text + prof->bc_stepper, prof->bc_stepper_insn);
 		if (prof->bc_suspend)
-			aarch64_insn_patch_text_nosync(text + prof->bc_suspend, 0x14000003);
+			aarch64_insn_patch_text_nosync(text + prof->bc_suspend, prof->bc_suspend_insn);
 	}
 }
 #endif /* CONFIG_ARM64 */
