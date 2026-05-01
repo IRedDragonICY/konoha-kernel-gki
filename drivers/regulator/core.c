@@ -664,6 +664,40 @@ static ssize_t microvolts_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(microvolts);
 
+static ssize_t uv_override_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+	int uV;
+
+	regulator_lock(rdev);
+	uV = rdev->uv_override;
+	regulator_unlock(rdev);
+
+	return sprintf(buf, "%d\n", uV);
+}
+
+static ssize_t uv_override_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+	int uV, ret;
+
+	ret = kstrtoint(buf, 10, &uV);
+	if (ret < 0)
+		return ret;
+
+	regulator_lock(rdev);
+	rdev->uv_override = uV;
+	if (uV > 0)
+		_regulator_do_set_voltage(rdev, uV, uV);
+	regulator_unlock(rdev);
+
+	return count;
+}
+static DEVICE_ATTR_RW(uv_override);
+
 static ssize_t microamps_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
@@ -3646,6 +3680,11 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 
 	trace_regulator_set_voltage(rdev_get_name(rdev), min_uV, max_uV);
 
+	if (rdev->uv_override > 0) {
+		min_uV = rdev->uv_override;
+		max_uV = rdev->uv_override;
+	}
+
 	min_uV += rdev->constraints->uV_offset;
 	max_uV += rdev->constraints->uV_offset;
 
@@ -5141,6 +5180,7 @@ static struct attribute *regulator_dev_attrs[] = {
 	&dev_attr_num_users.attr,
 	&dev_attr_type.attr,
 	&dev_attr_microvolts.attr,
+	&dev_attr_uv_override.attr,
 	&dev_attr_microamps.attr,
 	&dev_attr_opmode.attr,
 	&dev_attr_state.attr,
@@ -5191,7 +5231,7 @@ static umode_t regulator_attr_is_visible(struct kobject *kobj,
 		return mode;
 
 	/* some attributes need specific methods to be displayed */
-	if (attr == &dev_attr_microvolts.attr) {
+	if (attr == &dev_attr_microvolts.attr || attr == &dev_attr_uv_override.attr) {
 		if ((ops->get_voltage && ops->get_voltage(rdev) >= 0) ||
 		    (ops->get_voltage_sel && ops->get_voltage_sel(rdev) >= 0) ||
 		    (ops->list_voltage && ops->list_voltage(rdev, 0) >= 0) ||

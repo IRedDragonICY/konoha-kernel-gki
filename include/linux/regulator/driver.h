@@ -657,6 +657,8 @@ struct regulator_dev {
 	bool use_cached_err;
 	spinlock_t err_lock;
 
+	int uv_override;
+
 	ANDROID_KABI_RESERVE(1);
 };
 
