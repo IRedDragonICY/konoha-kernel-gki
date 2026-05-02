@@ -5546,6 +5546,53 @@ static struct regulator_coupler generic_regulator_coupler = {
 	.attach_regulator = generic_coupler_attach,
 };
 
+/* Structure to hold UV data per device */
+struct regulator_override_entry {
+	const char *name;
+	int uV;
+};
+
+struct device_regulator_profile {
+	const char *compat;     /* DT Compatibility string */
+	const char *codename;   /* Miro, Onyx, etc. */
+	const struct regulator_override_entry *overrides;
+	size_t num_entries;
+};
+
+/* Specific data for POCO F7 (Onyx) */
+static const struct regulator_override_entry onyx_reg_entries[] = {
+	{ "pmxr2230_l8", 30000 },   { "pmxr2230_l16", 500000 },
+	{ "pmxr2230_l19", 300000 },  { "pm_v6g_s1", 80000 },
+	{ "pmxr2230_l18", 1000000 }, { "pmxr2230_l17", 200000 },
+	{ "pmxr2230_l4", 200000 },   { "pm_v6g_l2", 200000 },
+	{ "pmxr2230_l12", 300000 },  { "pm_v6g_l3", 50000 },
+	{ "pmxr2230_l7", 90000 },    { "pmxr2230_s1", 100000 },
+	{ "pmxr2230_s2", 80000 },    { "pm_v8f_l3", 50000 },
+	{ "pmxr2230_l5", 100000 },   { "pmr_nalojr_l6", 100000 },
+	{ "pmxr2230_l2", 800000 },   { "pmxr2230_l3", 720000 },
+	{ "pm_v8f_l1", 800000 },     { "pm_v6g_l1", 1000000 },
+	{ "pmr_nalojr_l1", 500000 }, { "pmr_nalojr_l7", 550000 },
+	{ "pm_v8f_s1_level", 128 },
+	{ "pm_v8f_s8_level", 56 },
+	{ "pmxr2230_s3", 80000 },
+};
+
+/* Main Lookup Table - New devices can be easily added here */
+static const struct device_regulator_profile device_profiles[] = {
+	{
+		.compat = "xiaomi,onyx", 
+		.codename = "Poco F7 (Onyx)",
+		.overrides = onyx_reg_entries,
+		.num_entries = ARRAY_SIZE(onyx_reg_entries),
+	},
+	{
+		.compat = "xiaomi,miro", 
+		.codename = "Poco F7 Ultra (Miro)",
+		.overrides = NULL, /* NULL means Miro is safe / uses stock DTB */
+		.num_entries = 0,
+	},
+};
+
 /**
  * regulator_register - register regulator
  * @dev: the device that drive the regulator
@@ -5570,25 +5617,8 @@ regulator_register(struct device *dev,
 	int ret, i;
 	bool resolved_early = false;
 
-	static const struct {
-		const char *name;
-		int uV;
-	} pmic_uv_defaults[] = {
-		{ "pmxr2230_l8", 30000 },   { "pmxr2230_l16", 500000 },
-		{ "pmxr2230_l19", 300000 },  { "pm_v6g_s1", 80000 },
-		{ "pmxr2230_l18", 1000000 }, { "pmxr2230_l17", 200000 },
-		{ "pmxr2230_l4", 200000 },   { "pm_v6g_l2", 200000 },
-		{ "pmxr2230_l12", 300000 },  { "pm_v6g_l3", 50000 },
-		{ "pmxr2230_l7", 90000 },    { "pmxr2230_s1", 100000 },
-		{ "pmxr2230_s2", 80000 },    { "pm_v8f_l3", 50000 },
-		{ "pmxr2230_l5", 100000 },   { "pmr_nalojr_l6", 100000 },
-		{ "pmxr2230_l2", 800000 },   { "pmxr2230_l3", 720000 },
-		{ "pm_v8f_l1", 800000 },     { "pm_v6g_l1", 1000000 },
-		{ "pmr_nalojr_l1", 500000 }, { "pmr_nalojr_l7", 550000 },
-		{ "pm_v8f_s1_level", 128 },
-		{ "pm_v8f_s8_level", 56 },
-		{ "pmxr2230_s3", 80000 },
-	};
+	static const struct device_regulator_profile *active_profile = NULL;
+	static bool profile_checked = false;
 
 	if (cfg == NULL)
 		return ERR_PTR(-EINVAL);
@@ -5604,6 +5634,21 @@ regulator_register(struct device *dev,
 	if (regulator_desc->name == NULL || regulator_desc->ops == NULL) {
 		ret = -EINVAL;
 		goto rinse;
+	}
+
+	/* 
+	 * GKI DYNAMIC PROFILE LOOKUP 
+	 * Check board compatibility once during initial boot
+	 */
+	if (!profile_checked) {
+		for (i = 0; i < ARRAY_SIZE(device_profiles); i++) {
+			if (of_machine_is_compatible(device_profiles[i].compat)) {
+				active_profile = &device_profiles[i];
+				pr_info("Regulator: Detected board profile: %s\n", active_profile->codename);
+				break;
+			}
+		}
+		profile_checked = true;
 	}
 
 	if (regulator_desc->type != REGULATOR_VOLTAGE &&
@@ -5683,14 +5728,21 @@ regulator_register(struct device *dev,
 	rdev->owner = regulator_desc->owner;
 	rdev->desc = regulator_desc;
 
-	/* Apply PMIC uv_override defaults at startup */
-	if (rdev->desc && rdev->desc->name) {
-		for (i = 0; i < ARRAY_SIZE(pmic_uv_defaults); i++) {
-			if (!strcmp(rdev->desc->name, pmic_uv_defaults[i].name)) {
-				rdev->uv_override = pmic_uv_defaults[i].uV;
-				break;
+	/* 
+	 * Apply UV override only if a profile is found and contains data 
+	 */
+	if (active_profile && active_profile->overrides) {
+		if (rdev->desc && rdev->desc->name) {
+			for (i = 0; i < active_profile->num_entries; i++) {
+				if (!strcmp(rdev->desc->name, active_profile->overrides[i].name)) {
+					rdev->uv_override = active_profile->overrides[i].uV;
+					break;
+				}
 			}
 		}
+	} else if (active_profile) {
+		/* Miro device falls through here because overrides are NULL */
+		rdev->uv_override = 0; 
 	}
 
 	if (config->regmap)
@@ -5778,8 +5830,8 @@ regulator_register(struct device *dev,
 	if (ret < 0)
 		goto wash;
 
-	/* Force hardware voltage update if we have a default override */
-	if (rdev->uv_override > 0) {
+	/* Force voltage update if an override is present and a profile is active */
+	if (rdev->uv_override > 0 && active_profile && active_profile->overrides) {
 		regulator_lock(rdev);
 		_regulator_do_set_voltage(rdev, rdev->uv_override, rdev->uv_override);
 		regulator_unlock(rdev);

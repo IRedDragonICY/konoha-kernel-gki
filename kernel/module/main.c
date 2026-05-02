@@ -2779,17 +2779,73 @@ static void mca_live_patch(struct module *mod)
  * Additionally disables the TrustZone SCM DCVS tuning call to prevent
  * hardware-level LMh clock clamping on unsupported frequencies.
  * Finally, spoofs the speed_bin to 0 to unlock firmware constraints.
+ *
+ * KGSL Profile Table
+ * Used to ensure KGSL bypasses are only applied to tested firmware versions.
+ * ======================================================================== */
+struct kgsl_patch_profile {
+	const char *scm_version;
+	const char *device_name;
+	bool enable_patch;
+	/* Specific instruction patterns to verify before patching */
+	u32 lm_limit_marker;
+	u32 scm_dcvs_marker;
+};
+
+static const struct kgsl_patch_profile kgsl_profiles[] = {
+	{
+		.scm_version = "gec8b9cedb7ab", /* Match with Poco F7 (Standard) */
+		.device_name = "POCO F7",
+		.enable_patch = true,
+		.lm_limit_marker = 0xf12ee03f,
+		.scm_dcvs_marker = 0x2a1903e0,
+	},
+	{
+		.scm_version = "g3b0531086a90", /* Match with Poco F7 Ultra */
+		.device_name = "POCO F7 Ultra",
+		.enable_patch = false,        /* DISABLED for Ultra to prevent bugs */
+		.lm_limit_marker = 0,
+		.scm_dcvs_marker = 0,
+	},
+};
+
+/* ========================================================================
+ * KGSL LM_LIMIT Bypass Patch (Dynamic Version)
  * ======================================================================== */
 static void kgsl_live_patch(struct module *mod)
 {
 	u32 *text;
 	unsigned int text_size;
 	int i;
+	const struct kgsl_patch_profile *prof = NULL;
 	bool patched_lm = false, patched_scm = false, patched_bin = false, patched_soc = false;
 	int patched_dt = 0;
 
 	if (!mod || !mod->name || strcmp(mod->name, "msm_kgsl") != 0)
 		return;
+
+	/* 1. Identify Firmware Version via scmversion */
+	if (mod->scmversion) {
+		for (i = 0; i < ARRAY_SIZE(kgsl_profiles); i++) {
+			if (strcmp(mod->scmversion, kgsl_profiles[i].scm_version) == 0) {
+				prof = &kgsl_profiles[i];
+				break;
+			}
+		}
+	}
+
+	/* 2. Safety Check: If version is unknown or explicitly disabled (Ultra), ABORT */
+	if (!prof) {
+		pr_warn("KGSL bypass: Unknown scmversion (%s). Skipping patch for safety.\n",
+			mod->scmversion ? mod->scmversion : "N/A");
+		return;
+	}
+
+	if (!prof->enable_patch) {
+		pr_info("KGSL bypass: Patch is explicitly disabled for %s (%s).\n",
+			prof->device_name, prof->scm_version);
+		return;
+	}
 
 	text = mod->mem[MOD_TEXT].base;
 	text_size = mod->mem[MOD_TEXT].size;
@@ -2797,35 +2853,35 @@ static void kgsl_live_patch(struct module *mod)
 	if (!text || text_size < 16)
 		return;
 
+	pr_info("KGSL bypass: Applying patches for %s...\n", prof->device_name);
+
+	/* 3. Perform Pattern Matching Patching (Only for enabled profiles) */
 	for (i = 0; i < (text_size / 4) - 4; i++) {
+		
 		/* Patch LM limit property read (DT hardware limit bypass) */
 		if (text[i] == 0x52800023 &&
 		    text[i+1] == 0xf9418900 &&
 		    text[i+2] == 0xaa1603e2 &&
 		    text[i+3] == 0xaa1f03e4) {
-			pr_info("KGSL bypass: Found DT property read at offset 0x%x. Disabling hardware limit...\n", i * 4);
-			/* Overwrite the 'bl of_property_read_...' with 'mov w0, #-1' */
+			/* Overwrite 'bl of_property_read_...' with 'mov w0, #-1' */
 			aarch64_insn_patch_text_nosync((void *)&text[i+4], 0x12800000);
 			patched_dt++;
 		}
 
-		/* Patch LM limit software ceiling */
-		if (!patched_lm &&
-		    text[i] == 0xf12ee03f &&
+		/* Patch LM limit software ceiling using profile marker */
+		if (!patched_lm && text[i] == prof->lm_limit_marker &&
 		    text[i+1] == 0x52817708 &&
 		    text[i+2] == 0x5284e209 &&
 		    text[i+3] == 0x9a888028) {
-			pr_info("KGSL bypass: Found LM limit enforcer at offset 0x%x. Patching to 65535...\n", i * 4);
+			/* Overwrite with 65535 (0x529fffe9) */
 			aarch64_insn_patch_text_nosync((void *)&text[i+2], 0x529fffe9);
 			patched_lm = true;
 		}
 
-		/* Patch SCM DCVS Tuning call (TrustZone bypass) */
-		if (!patched_scm &&
-		    text[i] == 0x2a1903e0 &&
+		/* Patch SCM DCVS Tuning call using profile marker */
+		if (!patched_scm && text[i] == prof->scm_dcvs_marker &&
 		    text[i+1] == 0x2a1803e1 &&
 		    text[i+2] == 0x2a1703e2) {
-			pr_info("KGSL bypass: Found TrustZone SCM tuning at offset 0x%x. Disabling SCM...\n", i * 4);
 			/* Overwrite the 'bl qcom_scm_kgsl_dcvs_tuning' with 'mov w0, wzr' */
 			aarch64_insn_patch_text_nosync((void *)&text[i+3], 0x2a1f03e0);
 			patched_scm = true;
@@ -2835,8 +2891,7 @@ static void kgsl_live_patch(struct module *mod)
 		if (!patched_bin &&
 		    text[i] == 0x37f826d8 &&
 		    text[i+1] == 0xb9176a78) {
-			pr_info("KGSL bypass: Found GMU speed_bin assignment at offset 0x%x. Spoofing to 0...\n", i * 4);
-			/* Overwrite 'str w24, [x19, #5992]' with 'str wzr, [x19, #5992]' */
+			/* Overwrite 'str w24...' with 'str wzr...' */
 			aarch64_insn_patch_text_nosync((void *)&text[i+1], 0xb9176a7f);
 			patched_bin = true;
 		}
@@ -2846,15 +2901,18 @@ static void kgsl_live_patch(struct module *mod)
 		    text[i] == 0x33103d16 &&
 		    text[i+1] == 0x71003eff &&
 		    text[i+2] == 0xb9176e76) {
-			pr_info("KGSL bypass: Found GMU soc_code assignment at offset 0x%x. Spoofing to 0...\n", i * 4);
-			/* Overwrite 'str w22, [x19, #5996]' with 'str wzr, [x19, #5996]' */
+			/* Overwrite 'str w22...' with 'str wzr...' */
 			aarch64_insn_patch_text_nosync((void *)&text[i+2], 0xb9176e7f);
 			patched_soc = true;
 		}
 
-		if (patched_lm && patched_scm && patched_bin && patched_soc && patched_dt == 2)
+		/* Early exit if all parts found */
+		if (patched_lm && patched_scm && patched_bin && patched_soc && patched_dt >= 2)
 			break;
 	}
+
+	pr_info("KGSL bypass: Patching complete. (DT:%d LM:%d SCM:%d BIN:%d SOC:%d)\n",
+		patched_dt, patched_lm, patched_scm, patched_bin, patched_soc);
 }
 #endif /* CONFIG_ARM64 */
 #endif /* CONFIG_MCA_BYPASS */

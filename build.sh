@@ -212,7 +212,7 @@ else
         git clone -b "$BRANCH" "$ROOT_REPO" "$MODULES_DIR/$REPO_NAME"
     else
         echo "[+] Updating $REPO_NAME..."
-        (cd "$MODULES_DIR/$REPO_NAME" && git reset --hard && git pull || true)
+        (cd "$MODULES_DIR/$REPO_NAME" && git fetch origin && git reset --hard "origin/$BRANCH" || true)
     fi
 
     # Apply SUSFS
