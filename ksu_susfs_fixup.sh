@@ -75,10 +75,20 @@ if [ "$MANAGER" = "resukisu" ]; then
     if [ -f "$KSU_KERNEL/runtime/ksud_integration.c" ]; then
         sed -i 's/ksu_init_rc_hook_key_false/ksu_is_init_rc_hook_enabled/g' "$KSU_KERNEL/runtime/ksud_integration.c"
     fi
+    # [GLOBAL] fs/susfs.c — make loop call non-static for compatibility
     if [ -f "$(dirname "$0")/fs/susfs.c" ]; then
         sed -i 's/static void susfs_run_sus_path_loop(void)/void susfs_run_sus_path_loop(void)/g' "$(dirname "$0")/fs/susfs.c"
+        echo "[SUSFS-Fixup] fs/susfs.c: Made susfs_run_sus_path_loop non-static"
     fi
     exit 0
+fi
+
+# ==========================================================================
+# [GLOBAL] fs/susfs.c — make loop call non-static for compatibility
+# ==========================================================================
+if [ -f "$(dirname "$0")/fs/susfs.c" ]; then
+    sed -i 's/static void susfs_run_sus_path_loop(void)/void susfs_run_sus_path_loop(void)/g' "$(dirname "$0")/fs/susfs.c"
+    echo "[SUSFS-Fixup] fs/susfs.c: Made susfs_run_sus_path_loop non-static"
 fi
 
 # ==========================================================================
@@ -781,6 +791,20 @@ fix_ksu_next_susfs_umount() {
     # SukiSU's pattern. If set unconditionally, fs/exec.c's do_execveat_common
     # hook will skip su handling for ALL apps, breaking root.
     if [ -f "$SETUID_HOOK_C" ]; then
+        # Ensure workqueue include
+        if ! grep -q "linux/workqueue.h" "$SETUID_HOOK_C" 2>/dev/null; then
+            sed -i '/#include <linux\/susfs_def.h>/a #include <linux/workqueue.h>' "$SETUID_HOOK_C"
+        fi
+
+        # Repair existing direct calls if found
+        if grep -q "susfs_run_sus_path_loop()" "$SETUID_HOOK_C" 2>/dev/null; then
+            echo "[SUSFS-Fixup] setuid_hook.c: Migrating direct loop call to deferred workqueue"
+            # Delete the old-style loop call block completely
+            sed -i '/#ifdef CONFIG_KSU_SUSFS_SUS_PATH/,/#endif/d' "$SETUID_HOOK_C"
+            # Inject new deferred workqueue block before susfs_set_current_proc_umounted()
+            sed -i '/susfs_set_current_proc_umounted/i #ifdef CONFIG_KSU_SUSFS_SUS_PATH\n\t\t{\n\t\t\textern struct work_struct susfs_extra_works;\n\t\t\tschedule_work(\&susfs_extra_works);\n\t\t}\n#endif' "$SETUID_HOOK_C"
+        fi
+
         if ! grep -q "susfs_set_current_proc_umounted" "$SETUID_HOOK_C" 2>/dev/null; then
             sed -i '/ksu_handle_umount(old_uid, new_uid);/a \
 \n#ifdef CONFIG_KSU_SUSFS\
@@ -792,19 +816,14 @@ fix_ksu_next_susfs_umount() {
 \t    (is_appuid(new_uid) \&\& ksu_uid_should_umount(new_uid))) {\
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH\
 \t\t{\
-\t\t\textern struct cred *ksu_cred;\
-\t\t\textern void susfs_run_sus_path_loop(void);\
-\t\t\tif (ksu_cred) {\
-\t\t\t\tconst struct cred *saved = override_creds(ksu_cred);\
-\t\t\t\tsusfs_run_sus_path_loop();\
-\t\t\t\trevert_creds(saved);\
-\t\t\t}\
+\t\t\textern struct work_struct susfs_extra_works;\
+\t\t\tschedule_work(&susfs_extra_works);\
 \t\t}\
 #endif\
 \t\tsusfs_set_current_proc_umounted();\
 \t}\
 #endif' "$SETUID_HOOK_C"
-            echo "[SUSFS-Fixup] setuid_hook.c: Added conditional susfs_set_current_proc_umounted"
+            echo "[SUSFS-Fixup] setuid_hook.c: Added conditional susfs_set_current_proc_umounted (workqueue)"
         fi
     fi
 }
