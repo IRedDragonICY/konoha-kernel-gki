@@ -5570,6 +5570,26 @@ regulator_register(struct device *dev,
 	int ret, i;
 	bool resolved_early = false;
 
+	static const struct {
+		const char *name;
+		int uV;
+	} pmic_uv_defaults[] = {
+		{ "pmxr2230_l8", 700000 },   { "pmxr2230_l16", 500000 },
+		{ "pmxr2230_l19", 300000 },  { "pm_v6g_s1", 80000 },
+		{ "pmxr2230_l18", 1000000 }, { "pmxr2230_l17", 200000 },
+		{ "pmxr2230_l4", 200000 },   { "pm_v6g_l2", 200000 },
+		{ "pmxr2230_l12", 300000 },  { "pm_v6g_l3", 80000 },
+		{ "pmxr2230_l7", 90000 },    { "pmxr2230_s1", 100000 },
+		{ "pmxr2230_s2", 80000 },    { "pm_v8f_l3", 50000 },
+		{ "pmxr2230_l5", 100000 },   { "pmr_nalojr_l6", 100000 },
+		{ "pmxr2230_l2", 800000 },   { "pmxr2230_l3", 720000 },
+		{ "pm_v8f_l1", 800000 },     { "pm_v6g_l1", 1000000 },
+		{ "pmr_nalojr_l1", 500000 }, { "pmr_nalojr_l7", 550000 },
+		{ "pm_v8f_s1_level", 16 },  { "pm_v8f_s8_level", 16 },
+		{ "pm_v8f_s2_level", 56 },
+		{ "pmxr2230_s3", 90000 },
+	};
+
 	if (cfg == NULL)
 		return ERR_PTR(-EINVAL);
 	if (cfg->ena_gpiod)
@@ -5662,6 +5682,17 @@ regulator_register(struct device *dev,
 	rdev->reg_data = config->driver_data;
 	rdev->owner = regulator_desc->owner;
 	rdev->desc = regulator_desc;
+
+	/* Apply PMIC uv_override defaults at startup */
+	if (rdev->desc && rdev->desc->name) {
+		for (i = 0; i < ARRAY_SIZE(pmic_uv_defaults); i++) {
+			if (!strcmp(rdev->desc->name, pmic_uv_defaults[i].name)) {
+				rdev->uv_override = pmic_uv_defaults[i].uV;
+				break;
+			}
+		}
+	}
+
 	if (config->regmap)
 		rdev->regmap = config->regmap;
 	else if (dev_get_regmap(dev, NULL))
@@ -5746,6 +5777,13 @@ regulator_register(struct device *dev,
 	}
 	if (ret < 0)
 		goto wash;
+
+	/* Force hardware voltage update if we have a default override */
+	if (rdev->uv_override > 0) {
+		regulator_lock(rdev);
+		_regulator_do_set_voltage(rdev, rdev->uv_override, rdev->uv_override);
+		regulator_unlock(rdev);
+	}
 
 	ret = regulator_init_coupling(rdev);
 	if (ret < 0)
